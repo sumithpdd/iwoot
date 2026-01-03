@@ -247,6 +247,45 @@ if (!user) return <Login />
 - Uses React Hook Form
 - Validates with Zod
 - Handles both create and update
+- Includes ProductLookup component for auto-filling product details
+
+### `/components/product-lookup.tsx`
+
+**Purpose**: Search and auto-fill product information from online databases
+
+**Key Points**:
+- Searches products by name or barcode/UPC
+- Extracts product info from URLs
+- Uses UPCitemdb API (free, no key required)
+- Auto-fills form fields when product is found
+
+**Usage**:
+```typescript
+<ProductLookup
+  onProductFound={(product) => {
+    // Handle found product data
+  }}
+  websiteUrl="https://example.com/product"
+/>
+```
+
+### `/lib/services/product-lookup.service.ts`
+
+**Purpose**: Service for fetching product information from external APIs
+
+**Functions**:
+- `lookupProduct(query: string)` - Search by name or barcode
+- `lookupProductByUrl(url: string)` - Extract info from URL
+
+**Example**:
+```typescript
+import { lookupProduct } from "@/lib/services/product-lookup.service"
+
+const result = await lookupProduct("iPad Pro")
+if (result) {
+  console.log(result.name, result.brand, result.price)
+}
+```
 - Shows errors inline
 
 **Form Flow**:

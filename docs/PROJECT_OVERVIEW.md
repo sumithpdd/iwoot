@@ -18,6 +18,7 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
 
 ✅ **Product Management**
 - Add products you want or have
+- **Auto-fill product details** - Search online databases to automatically populate product information
 - Edit product information
 - Delete products
 - View product details
@@ -27,6 +28,12 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
 - Monitor current prices (for wanted products)
 - Record purchase prices (for owned products)
 - Price history tracking
+
+✅ **Product Lookup**
+- Search products by name or barcode/UPC
+- Auto-fill product details from online databases
+- Extract product information from URLs
+- Powered by UPCitemdb (free API)
 
 ✅ **Admin Dashboard**
 - View all users

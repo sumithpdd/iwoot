@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { Product, ProductType } from "@/lib/types/product"
@@ -56,16 +56,7 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router])
 
-  useEffect(() => {
-    if (user && !authLoading) {
-      loadProducts()
-      loadReceipts()
-    } else if (!authLoading && !user) {
-      setLoading(false)
-    }
-  }, [user, authLoading])
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     if (!user) {
       setError("No user found. Please log in.")
       setLoading(false)
@@ -101,9 +92,9 @@ export default function DashboardPage() {
       console.log("[Dashboard] Setting loading to false")
       setLoading(false)
     }
-  }
+  }, [user])
 
-  const loadReceipts = async () => {
+  const loadReceipts = useCallback(async () => {
     if (!user) return
     try {
       const data = await getReceipts(user.uid)
@@ -111,7 +102,16 @@ export default function DashboardPage() {
     } catch (error: any) {
       console.error("Error loading receipts:", error)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      loadProducts()
+      loadReceipts()
+    } else if (!authLoading && !user) {
+      setLoading(false)
+    }
+  }, [user, authLoading, loadProducts, loadReceipts])
 
   const handleOpenDialog = (type: ProductType, product?: Product) => {
     setSelectedType(type)

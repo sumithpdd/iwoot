@@ -45,6 +45,47 @@ import { deleteProduct } from "@/lib/firebase/products"
 await deleteProduct(productId)
 ```
 
+## Product Lookup
+
+### Search Product by Name or Barcode
+```typescript
+import { lookupProduct } from "@/lib/services/product-lookup.service"
+
+// Search by product name
+const result = await lookupProduct("iPad Pro")
+
+// Search by barcode/UPC
+const result = await lookupProduct("0123456789012")
+
+if (result) {
+  console.log(result.name)        // Product name
+  console.log(result.brand)       // Brand
+  console.log(result.description) // Description
+  console.log(result.images)      // Array of image URLs
+  console.log(result.price)       // Price
+}
+```
+
+### Extract Product Info from URL
+```typescript
+import { lookupProductByUrl } from "@/lib/services/product-lookup.service"
+
+const result = await lookupProductByUrl("https://example.com/product")
+```
+
+### Using ProductLookup Component
+```tsx
+import ProductLookup from "@/components/product-lookup"
+
+<ProductLookup
+  onProductFound={(product) => {
+    // Auto-fill form with product data
+    console.log(product)
+  }}
+  websiteUrl="https://example.com/product"
+/>
+```
+
 ## Authentication
 
 ### Get Current User

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -76,11 +76,21 @@ export default function ReceiptDialog({
         },
   })
 
+  const loadProducts = useCallback(async () => {
+    if (!user) return
+    try {
+      const data = await getProducts(user.uid, "have")
+      setProducts(data)
+    } catch (error) {
+      console.error("Error loading products:", error)
+    }
+  }, [user])
+
   useEffect(() => {
     if (user) {
       loadProducts()
     }
-  }, [user])
+  }, [user, loadProducts])
 
   useEffect(() => {
     if (receipt) {
@@ -100,16 +110,6 @@ export default function ReceiptDialog({
       setReceiptImageUrl("")
     }
   }, [receipt, productId, reset, open])
-
-  const loadProducts = async () => {
-    if (!user) return
-    try {
-      const data = await getProducts(user.uid, "have")
-      setProducts(data)
-    } catch (error) {
-      console.error("Error loading products:", error)
-    }
-  }
 
   const addItem = () => {
     setItems([

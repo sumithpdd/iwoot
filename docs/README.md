@@ -73,6 +73,12 @@ Complete guide to all documentation files in the IWOOT project.
    - Security rules
    - Image upload guide
 
+5. **`docs/PRODUCT_LOOKUP.md`** - Product auto-fill feature
+   - How to use product lookup
+   - Search by name or barcode
+   - Extract info from URLs
+   - Troubleshooting
+
 ## 📋 Project Information
 
 1. **`docs/PROJECT_OVERVIEW.md`** - Project overview
@@ -93,6 +99,9 @@ docs/
 ├── FIRESTORE_RULES.md         # Security rules
 ├── FIREBASE_SETUP.md          # Firebase config
 ├── FIREBASE_STORAGE_SETUP.md  # Storage setup
+├── PRODUCT_LOOKUP.md          # Product auto-fill feature
+├── DEPLOYMENT.md              # Vercel deployment guide
+├── VERCEL_ENV_SETUP.md        # Vercel environment variables
 └── PROJECT_OVERVIEW.md        # Project info
 
 Root:

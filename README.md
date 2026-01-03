@@ -91,6 +91,7 @@ Open [http://localhost:3000](http://localhost:3000)
 - **"I Have One Of Those"**: Track products you own, record purchase prices, monitor current values
 
 ### Additional Features
+- 🤖 **Auto-fill product details** - Search online databases to automatically fill product information
 - 📸 Image uploads (Firebase Storage)
 - 📊 Price history tracking
 - 🧾 Receipt management
@@ -378,6 +379,8 @@ npm install
 - `docs/FIREBASE_SETUP.md` - Firebase configuration details
 - `docs/FIRESTORE_RULES.md` - Security rules explanation
 - `docs/FIREBASE_STORAGE_SETUP.md` - Storage setup guide
+- `docs/PRODUCT_LOOKUP.md` - Product auto-fill feature guide
+- `docs/DEPLOYMENT.md` - Vercel deployment instructions
 
 ## 🔒 Security Notes
 

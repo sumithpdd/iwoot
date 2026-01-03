@@ -25,6 +25,7 @@ iwoot/
 │   ├── ui/               # Reusable UI components (shadcn/ui)
 │   ├── product-dialog.tsx # Product form dialog
 │   ├── product-list.tsx  # Product list display
+│   ├── product-lookup.tsx # Product search and auto-fill component
 │   └── ...
 │
 ├── lib/                   # Core libraries and utilities
@@ -36,7 +37,8 @@ iwoot/
 │   │
 │   ├── services/         # Business Logic Layer
 │   │   ├── product.service.ts
-│   │   └── receipt.service.ts
+│   │   ├── receipt.service.ts
+│   │   └── product-lookup.service.ts  # Product lookup from external APIs
 │   │
 │   ├── validators/        # Validation logic
 │   │   ├── product.validator.ts

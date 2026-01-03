@@ -20,6 +20,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import ImageUpload from "@/components/image-upload"
+import ProductLookup from "@/components/product-lookup"
+import { ProductLookupResult } from "@/lib/services/product-lookup.service"
 
 const wantProductSchema = z.object({
   name: z.string().min(1, "Product name is required"),
@@ -85,6 +87,7 @@ export default function ProductDialog({
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<WantProductForm | HaveProductForm>({
     resolver: zodResolver(schema),
@@ -231,6 +234,33 @@ export default function ProductDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Product Lookup - Only show when creating new product */}
+          {!product && (
+            <ProductLookup
+              onProductFound={(lookupResult: ProductLookupResult) => {
+                // Auto-fill form with lookup results
+                const currentValues = watch()
+                reset({
+                  ...currentValues,
+                  name: lookupResult.name || currentValues.name || "",
+                  brand: lookupResult.brand || currentValues.brand || "",
+                  description: lookupResult.description || currentValues.description || "",
+                  category: lookupResult.category || currentValues.category || "",
+                  model: lookupResult.model || currentValues.model || "",
+                  sku: lookupResult.sku || currentValues.sku || "",
+                  website: lookupResult.website || currentValues.website || "",
+                  originalPrice: lookupResult.price || currentValues.originalPrice || 0,
+                  images: lookupResult.images || currentValues.images || [],
+                })
+                // Update image URLs if provided
+                if (lookupResult.images && lookupResult.images.length > 0) {
+                  setImageUrls(lookupResult.images)
+                }
+              }}
+              websiteUrl={watch("website")}
+            />
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="name" className="text-base font-semibold">Product Name *</Label>
