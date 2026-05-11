@@ -6,8 +6,10 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Receipt, ReceiptItem } from "@/lib/types/receipt"
 import { Product } from "@/lib/types/product"
-import { createReceipt, updateReceipt } from "@/lib/firebase/receipts"
-import { getProducts } from "@/lib/firebase/products"
+import type { Store } from "@/lib/types/store"
+import { ReceiptService } from "@/lib/services/receipt.service"
+import { ProductService } from "@/lib/services/product.service"
+import { StoreService } from "@/lib/services/store.service"
 import { useAuth } from "@/lib/auth-context"
 import {
   Dialog,
@@ -21,12 +23,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Trash2 } from "lucide-react"
+import { Loader2, Plus, Trash2 } from "lucide-react"
 import ImageUpload from "@/components/image-upload"
+import {
+  CopyToClipboardButton,
+  copyFieldText,
+} from "@/components/copy-to-clipboard-button"
 
 const receiptSchema = z.object({
   receiptNumber: z.string().min(1, "Receipt number is required"),
   storeName: z.string().min(1, "Store name is required"),
+  storeAddress: z.string().optional(),
+  storeWebsite: z.union([z.string().url(), z.literal("")]).optional(),
   receiptDate: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
 })
@@ -36,6 +44,8 @@ type ReceiptForm = z.infer<typeof receiptSchema>
 interface ReceiptDialogProps {
   open: boolean
   onClose: () => void
+  /** Called after a successful create/update so the parent can refresh lists without a full-page loader */
+  onSaved?: () => void
   receipt?: Receipt | null
   productId?: string // If creating receipt from product
 }
@@ -43,21 +53,31 @@ interface ReceiptDialogProps {
 export default function ReceiptDialog({
   open,
   onClose,
+  onSaved,
   receipt,
   productId,
 }: ReceiptDialogProps) {
   const { user } = useAuth()
   const { toast } = useToast()
+
+  const getToken = useCallback(
+    () => user?.getIdToken() ?? Promise.resolve(null),
+    [user]
+  )
   const [products, setProducts] = useState<Product[]>([])
   const [items, setItems] = useState<ReceiptItem[]>(
     receipt?.items || (productId ? [{ id: "1", productId, quantity: 1, discountedPrice: 0 }] : [])
   )
   const [receiptImageUrl, setReceiptImageUrl] = useState<string>("")
+  const [stores, setStores] = useState<Store[]>([])
+  const [linkedStoreId, setLinkedStoreId] = useState("")
 
   const {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ReceiptForm>({
     resolver: zodResolver(receiptSchema),
@@ -65,12 +85,16 @@ export default function ReceiptDialog({
       ? {
           receiptNumber: receipt.receiptNumber,
           storeName: receipt.storeName,
+          storeAddress: receipt.storeAddress || "",
+          storeWebsite: receipt.storeWebsite || "",
           receiptDate: receipt.receiptDate,
           notes: receipt.notes || "",
         }
       : {
           receiptNumber: `RCPT-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}`,
           storeName: "",
+          storeAddress: "",
+          storeWebsite: "",
           receiptDate: new Date().toISOString().split("T")[0],
           notes: "",
         },
@@ -79,12 +103,12 @@ export default function ReceiptDialog({
   const loadProducts = useCallback(async () => {
     if (!user) return
     try {
-      const data = await getProducts(user.uid, "have")
+      const data = await ProductService.getProducts(getToken, "have")
       setProducts(data)
     } catch (error) {
       console.error("Error loading products:", error)
     }
-  }, [user])
+  }, [user, getToken])
 
   useEffect(() => {
     if (user) {
@@ -92,22 +116,43 @@ export default function ReceiptDialog({
     }
   }, [user, loadProducts])
 
+  const loadStores = useCallback(async () => {
+    if (!user) return
+    try {
+      const data = await StoreService.getStores(getToken)
+      setStores(data)
+    } catch (e) {
+      console.error("[ReceiptDialog] load stores:", e)
+    }
+  }, [user, getToken])
+
+  useEffect(() => {
+    if (user && open) {
+      void loadStores()
+    }
+  }, [user, open, loadStores])
+
   useEffect(() => {
     if (receipt) {
       reset({
         receiptNumber: receipt.receiptNumber,
         storeName: receipt.storeName,
+        storeAddress: receipt.storeAddress || "",
+        storeWebsite: receipt.storeWebsite || "",
         receiptDate: receipt.receiptDate,
         notes: receipt.notes || "",
       })
       setItems(receipt.items)
       setReceiptImageUrl(receipt.receiptImage || "")
+      setLinkedStoreId(receipt.storeId || "")
     } else if (productId) {
       setItems([{ id: "1", productId, quantity: 1, discountedPrice: 0 }])
       setReceiptImageUrl("")
+      setLinkedStoreId("")
     } else {
       setItems([])
       setReceiptImageUrl("")
+      setLinkedStoreId("")
     }
   }, [receipt, productId, reset, open])
 
@@ -158,21 +203,25 @@ export default function ReceiptDialog({
         totalAmount: calculateTotal(),
         userId: user.uid,
         receiptImage: receiptImageUrl || undefined,
+        storeId: linkedStoreId.trim() || (receipt?.id ? null : undefined),
+        storeAddress: data.storeAddress?.trim() || undefined,
+        storeWebsite: data.storeWebsite?.trim() || undefined,
       }
 
       if (receipt?.id) {
-        await updateReceipt(receipt.id, receiptData)
+        await ReceiptService.updateReceipt(getToken, receipt.id, receiptData)
         toast({
-          title: "Success",
-          description: "Receipt updated successfully",
+          title: "Saved",
+          description: "Receipt updated.",
         })
       } else {
-        await createReceipt(receiptData)
+        await ReceiptService.createReceipt(getToken, receiptData)
         toast({
-          title: "Success",
-          description: "Receipt created successfully",
+          title: "Added",
+          description: "Receipt saved.",
         })
       }
+      onSaved?.()
       onClose()
     } catch (error: any) {
       toast({
@@ -183,24 +232,55 @@ export default function ReceiptDialog({
     }
   }
 
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && !isSubmitting) {
+      onClose()
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] lg:max-w-[1000px] max-h-[95vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+      <DialogContent
+        className="max-h-[95vh] overflow-y-auto sm:max-w-[900px] lg:max-w-[1000px]"
+        onPointerDownOutside={(e) => {
+          if (isSubmitting) e.preventDefault()
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isSubmitting) e.preventDefault()
+        }}
+      >
         <DialogHeader>
-          <DialogTitle>
-            {receipt ? "Edit Receipt" : "Add Receipt"}
-          </DialogTitle>
+          <DialogTitle>{receipt ? "Edit receipt" : "Add receipt"}</DialogTitle>
           <DialogDescription>
             {receipt
-              ? "Update the receipt information"
-              : "Add a new receipt for your purchase"}
+              ? "Update line items and totals, then save. Ctrl+Enter (⌘+Enter) saves."
+              : "Link items to products you own, then save. Ctrl+Enter (⌘+Enter) saves."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault()
+              void handleSubmit(onSubmit)()
+            }
+          }}
+          className="space-y-4"
+        >
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="receiptNumber">Receipt Number</Label>
-              <Input id="receiptNumber" {...register("receiptNumber")} />
+              <div className="flex gap-1 items-center">
+                <Input
+                  id="receiptNumber"
+                  {...register("receiptNumber")}
+                  className="min-w-0 flex-1"
+                />
+                <CopyToClipboardButton
+                  value={copyFieldText(watch("receiptNumber"))}
+                  label="Receipt number"
+                />
+              </div>
               {errors.receiptNumber && (
                 <p className="text-sm text-red-500">
                   {errors.receiptNumber.message}
@@ -209,7 +289,18 @@ export default function ReceiptDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="receiptDate">Date</Label>
-              <Input id="receiptDate" type="date" {...register("receiptDate")} />
+              <div className="flex gap-1 items-center">
+                <Input
+                  id="receiptDate"
+                  type="date"
+                  {...register("receiptDate")}
+                  className="min-w-0 flex-1"
+                />
+                <CopyToClipboardButton
+                  value={copyFieldText(watch("receiptDate"))}
+                  label="Receipt date"
+                />
+              </div>
               {errors.receiptDate && (
                 <p className="text-sm text-red-500">
                   {errors.receiptDate.message}
@@ -220,12 +311,82 @@ export default function ReceiptDialog({
 
           <div className="space-y-2">
             <Label htmlFor="storeName">Store Name</Label>
-            <Input id="storeName" {...register("storeName")} />
+            <div className="flex gap-1 items-center">
+              <Input
+                id="storeName"
+                {...register("storeName")}
+                className="min-w-0 flex-1"
+              />
+              <CopyToClipboardButton
+                value={copyFieldText(watch("storeName"))}
+                label="Store name"
+              />
+            </div>
             {errors.storeName && (
               <p className="text-sm text-red-500">
                 {errors.storeName.message}
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="linked-store">Link to saved store (optional)</Label>
+            <select
+              id="linked-store"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={linkedStoreId}
+              onChange={(e) => {
+                const id = e.target.value
+                setLinkedStoreId(id)
+                const st = stores.find((s) => s.id === id)
+                if (st) {
+                  setValue("storeName", st.name)
+                  setValue("storeAddress", st.address || "")
+                  setValue("storeWebsite", st.website || "")
+                }
+              }}
+            >
+              <option value="">None</option>
+              {stores.map((s) => (
+                <option key={s.id} value={s.id!}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Choosing a profile fills the fields below; you can still edit them for this receipt only.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="storeAddress">Store address (optional)</Label>
+              <Input
+                id="storeAddress"
+                {...register("storeAddress")}
+                placeholder="As printed on receipt"
+                className="min-w-0 flex-1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="storeWebsite">Store website (optional)</Label>
+              <div className="flex gap-1 items-center">
+                <Input
+                  id="storeWebsite"
+                  type="url"
+                  {...register("storeWebsite")}
+                  placeholder="https://…"
+                  className="min-w-0 flex-1"
+                />
+                <CopyToClipboardButton
+                  value={copyFieldText(watch("storeWebsite"))}
+                  label="Store website"
+                />
+              </div>
+              {errors.storeWebsite && (
+                <p className="text-sm text-red-500">{errors.storeWebsite.message as string}</p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -301,36 +462,59 @@ export default function ReceiptDialog({
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (Optional)</Label>
-            <Input id="notes" {...register("notes")} placeholder="Additional notes..." />
+            <div className="flex gap-1 items-center">
+              <Input
+                id="notes"
+                {...register("notes")}
+                placeholder="Additional notes..."
+                className="min-w-0 flex-1"
+              />
+              <CopyToClipboardButton
+                value={copyFieldText(watch("notes"))}
+                label="Notes"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label>Receipt Image (Optional)</Label>
             <ImageUpload
-              images={receiptImageUrl ? [receiptImageUrl] : []}
-              onImagesChange={(urls) => setReceiptImageUrl(urls[0] || "")}
+              images={receiptImageUrl ? [{ url: receiptImageUrl, tags: [] }] : []}
+              onImagesChange={(entries) => setReceiptImageUrl(entries[0]?.url ?? "")}
               maxImages={1}
               folder="receipts"
               userId={user?.uid || ""}
               disabled={!user}
+              allowTags={false}
+              allowReorder={false}
             />
           </div>
 
-          <DialogFooter className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Button 
-              type="button" 
-              variant="outline" 
+          <DialogFooter className="border-t border-gray-200 pt-4 dark:border-gray-700">
+            <Button
+              type="button"
+              variant="outline"
               onClick={onClose}
+              disabled={isSubmitting}
               className="px-6"
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmitting}
-              className="px-6 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              className="min-w-[140px] px-6 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-70"
             >
-              {isSubmitting ? "Saving..." : receipt ? "Update Receipt" : "Create Receipt"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  Saving…
+                </>
+              ) : receipt ? (
+                "Save changes"
+              ) : (
+                "Add receipt"
+              )}
             </Button>
           </DialogFooter>
         </form>

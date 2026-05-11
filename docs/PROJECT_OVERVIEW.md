@@ -5,7 +5,7 @@
 IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a price tracking application that helps users:
 
 1. **Track products they want to buy** - Monitor prices and get notified of price drops
-2. **Track products they own** - Keep track of purchase prices and current market values
+2. **Track products they own** - Keep track of purchase prices, resale listing state, and current market values
 
 ## Application Features
 
@@ -19,15 +19,29 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
 ✅ **Product Management**
 - Add products you want or have
 - **Auto-fill product details** - Search online databases to automatically populate product information
+- **Rich text description** and optional **technical specifications** (key/value), with safe HTML rendering in lists
+- **Multiple images** per product (Firebase Storage), reordering, optional tags
 - Edit product information
 - Delete products
-- View product details
+- View product details in grid or table layout
+
+✅ **Stores (retail profiles)**
+- Save shops or marketplaces where you buy (optional link to **“I have”** products)
+- Create from scratch or prefill from a **receipt**
+
+✅ **Receipts**
+- Attach receipts for purchases; link to products where relevant
 
 ✅ **Price Tracking**
 - Track original prices
 - Monitor current prices (for wanted products)
 - Record purchase prices (for owned products)
 - Price history tracking
+
+✅ **Resale / marketplace helpers**
+- **Selling journey** card on the dashboard (stores → “I have” + photos → compare → receipts)
+- **“Currently selling”** and **where listed** fields for owned items
+- **Static price compare** pages (`/sell-compare`) with example venue grids (maintained in `lib/data/`)
 
 ✅ **Product Lookup**
 - Search products by name or barcode/UPC
@@ -70,55 +84,43 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
    - Redirects to dashboard after login
 
 2. **Dashboard** (`/dashboard`)
-   - Main application page
-   - Two tabs: "I Want" and "I Have"
-   - Product list view
-   - Add/Edit/Delete products
+   - Main application page after login
+   - Tabs: **Products**, **Receipts**, **Stores**
+   - Products: filters (all / want / have), search, sort, grid or table view
+   - Selling journey card and nav link to **Sell compare**
 
-3. **Admin Dashboard** (`/admin`)
+3. **Sell compare hub** (`/sell-compare`)
+   - Static reference pages for resale price comparison (e.g. `/sell-compare/airpods-pro-2`)
+
+4. **Admin Dashboard** (`/admin`)
    - User management
    - System administration
    - Extensible for more features
 
-### Components
+### Components (selected)
 
-- **ProductDialog**: Form for adding/editing products
-- **ProductList**: Displays products in a card grid
-- **UI Components**: Reusable shadcn/ui components
+- **ProductDialog**: Add/edit products (lookup, rich description, specs, images, store link for “have”, selling flags)
+- **ProductList**: Grid and table views; description previews support HTML → plain text or sanitized snippets
+- **StoreDialog** / **StoreList**: User-scoped store profiles
+- **ReceiptDialog** / **ReceiptList**: Receipt capture and listing
+- **SellingJourneyCard**: Dashboard guidance for resale workflow
+- **SellingVenuePriceGrid**: Compare table/cards for static venue data
+- **UI Components**: Reusable shadcn/ui primitives
 
 ### Data Structure
 
 #### Product Types
 
-**WantProduct** (Products you want):
-```typescript
-{
-  type: "want"
-  name: string
-  brand: string
-  website: string
-  originalPrice: number
-  currentPrice?: number
-  date: string
-  userId: string
-  priceHistory?: PriceHistory[]
-}
-```
+See `lib/types/product.ts` for the full model. Highlights:
 
-**HaveProduct** (Products you own):
-```typescript
-{
-  type: "have"
-  name: string
-  brand: string
-  website: string
-  originalPrice: number
-  priceBought: number
-  date: string
-  userId: string
-  priceHistory?: PriceHistory[]
-}
-```
+**WantProduct** (products you want):
+- `type: "want"`, plus `currentPrice`, optional `targetPrice`, `priceHistory`
+- Optional: `description` (HTML), `specifications`, `images` (`ProductImageEntry[]`), category, model, sku, etc.
+
+**HaveProduct** (products you own):
+- `type: "have"`, plus `priceBought`, optional `storeId`, `purchaseLocation`, `warrantyExpiry`, `receiptId`
+- Optional resale tracking: `listingStatus`, `listingPlatforms[]`, `soldAt`, `soldWhere` (legacy `isSelling` / `sellingOn` still read)
+- Same optional rich `description`, `specifications`, and `images` as above
 
 ## User Flow
 
@@ -141,43 +143,39 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
 5. Redirected to dashboard
 6. Views/manages products
 
-### Product Management Flow
+### Product management flow
 
-1. User clicks "Add Product"
-2. Dialog opens with form
-3. User selects type (Want/Have)
-4. Fills in product details
-5. Submits form
-6. Product saved to Firestore
-7. Product appears in list
-8. User can edit or delete
+1. User opens **Products** tab and chooses **Add** (want vs have is chosen when opening the dialog).
+2. Optional: use **Product lookup** or paste a URL to auto-fill.
+3. User fills essentials (name, brand, website URL, prices, date) and optional description, specs, images, store (for “have”).
+4. Submit saves via API to Firestore; list refreshes.
+
+### Selling-oriented flow
+
+1. Optionally add **Stores** and **Receipts** from their tabs.
+2. Add an **“I have”** product with photos and retail or listing URL.
+3. Use **Sell compare** for rough reference prices; update static data in repo as needed.
+4. When listing on Gumtree, Vinted, etc., enable **Currently selling** and set **Where it is listed**.
 
 ## Database Schema
 
 ### Firestore Collections
 
-**products** (Collection)
-```
-{
-  id: string (auto-generated)
-  type: "want" | "have"
-  name: string
-  brand: string
-  website: string
-  originalPrice: number
-  currentPrice?: number (for "want" type)
-  priceBought?: number (for "have" type)
-  date: string (ISO date)
-  userId: string
-  priceHistory?: Array<{
-    price: number
-    date: string
-    website: string
-  }>
-  createdAt: string
-  updatedAt: string
-}
-```
+**products** (collection) — see validators and API for the full writable shape. Typical fields include:
+
+- `type`, `name`, `brand`, `website`, `originalPrice`, `date`, `userId`
+- Want: `currentPrice`, `targetPrice`, `priceHistory`
+- Have: `priceBought`, `storeId`, `purchaseLocation`, `warrantyExpiry`, `listingStatus`, `listingPlatforms`, `soldAt`, `soldWhere`, `receiptId`, `priceHistory` (legacy `isSelling`, `sellingOn` optional)
+- Common optional: `description` (string, HTML), `specifications` (map), `images` (array of `{ url, tags? }` or legacy URL strings), `category`, `model`, `sku`, `notes`, etc.
+- Timestamps: `createdAt`, `updatedAt` (and optional email audit fields from API)
+
+**stores** (collection)
+
+- User-scoped retailer profile: `userId`, `name`, optional `website`, `address`, `phone`, `notes`, `linkedReceiptIds`, timestamps
+
+**receipts** (collection)
+
+- User-scoped receipt documents (see `lib/types/receipt.ts`)
 
 **users** (Collection - for future use)
 ```
@@ -198,8 +196,8 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
 - Protected routes check authentication
 
 ### Firestore Security Rules
-- Users can only read/write their own products
-- Products must have matching userId
+- Users can only read/write their own products, receipts, and stores
+- Documents must include a `userId` matching the signed-in user where applicable
 - Authentication required for all operations
 
 ## Future Enhancements
@@ -226,15 +224,11 @@ Potential features to add:
    - Share wishlists with friends/family
    - Collaborative lists
 
-6. **Product Images**
-   - Upload or link product images
-   - Visual product cards
-
-7. **Export Data**
+6. **Export Data**
    - Export products to CSV/JSON
    - Backup functionality
 
-8. **Mobile App**
+7. **Mobile App**
    - React Native version
    - Push notifications
 

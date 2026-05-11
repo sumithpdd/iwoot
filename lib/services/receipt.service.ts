@@ -1,51 +1,43 @@
 /**
- * Receipt Service Layer
- * 
- * Service layer for receipt operations.
- * Handles business logic and validation.
+ * Receipt Service — secured REST APIs only.
  */
 
 import { Receipt } from "@/lib/types/receipt"
-import * as receiptRepository from "@/lib/firebase/receipts"
+import { apiRequest } from "@/lib/api/http"
 import { validateReceipt, validateReceiptUpdate } from "@/lib/validators/receipt.validator"
 
 export class ReceiptService {
-  /**
-   * Get all receipts for a user
-   */
-  static async getReceipts(userId: string): Promise<Receipt[]> {
-    if (!userId || typeof userId !== "string") {
-      throw new Error("Valid userId is required")
-    }
-
+  static async getReceipts(
+    getToken: () => Promise<string | null>
+  ): Promise<Receipt[]> {
     try {
-      return await receiptRepository.getReceipts(userId)
-    } catch (error: any) {
+      return await apiRequest<Receipt[]>(getToken, "/api/receipts")
+    } catch (error: unknown) {
       console.error("[ReceiptService] Error fetching receipts:", error)
-      throw new Error(`Failed to fetch receipts: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch receipts: ${msg}`)
     }
   }
 
-  /**
-   * Get a single receipt by ID
-   */
-  static async getReceipt(receiptId: string): Promise<Receipt | null> {
-    if (!receiptId || typeof receiptId !== "string") {
-      throw new Error("Valid receiptId is required")
-    }
-
+  static async getReceipt(
+    getToken: () => Promise<string | null>,
+    receiptId: string
+  ): Promise<Receipt | null> {
+    if (!receiptId) throw new Error("Valid receiptId is required")
     try {
-      return await receiptRepository.getReceipt(receiptId)
-    } catch (error: any) {
+      return await apiRequest<Receipt>(getToken, `/api/receipts/${receiptId}`)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error)
+      if (msg.includes("404") || msg.toLowerCase().includes("not found")) {
+        return null
+      }
       console.error("[ReceiptService] Error fetching receipt:", error)
-      throw new Error(`Failed to fetch receipt: ${error.message}`)
+      throw new Error(`Failed to fetch receipt: ${msg}`)
     }
   }
 
-  /**
-   * Create a new receipt
-   */
   static async createReceipt(
+    getToken: () => Promise<string | null>,
     receiptData: Omit<Receipt, "id" | "createdAt" | "updatedAt">
   ): Promise<string> {
     const validation = validateReceipt(receiptData)
@@ -54,23 +46,24 @@ export class ReceiptService {
     }
 
     try {
-      return await receiptRepository.createReceipt(receiptData)
-    } catch (error: any) {
+      const res = await apiRequest<{ id: string }>(getToken, "/api/receipts", {
+        method: "POST",
+        body: JSON.stringify(receiptData),
+      })
+      return res.id
+    } catch (error: unknown) {
       console.error("[ReceiptService] Error creating receipt:", error)
-      throw new Error(`Failed to create receipt: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to create receipt: ${msg}`)
     }
   }
 
-  /**
-   * Update an existing receipt
-   */
   static async updateReceipt(
+    getToken: () => Promise<string | null>,
     receiptId: string,
     updates: Partial<Omit<Receipt, "id" | "userId" | "createdAt">>
   ): Promise<void> {
-    if (!receiptId || typeof receiptId !== "string") {
-      throw new Error("Valid receiptId is required")
-    }
+    if (!receiptId) throw new Error("Valid receiptId is required")
 
     const validation = validateReceiptUpdate(updates)
     if (!validation.valid) {
@@ -78,43 +71,49 @@ export class ReceiptService {
     }
 
     try {
-      await receiptRepository.updateReceipt(receiptId, updates)
-    } catch (error: any) {
+      await apiRequest(getToken, `/api/receipts/${receiptId}`, {
+        method: "PATCH",
+        body: JSON.stringify(updates),
+      })
+    } catch (error: unknown) {
       console.error("[ReceiptService] Error updating receipt:", error)
-      throw new Error(`Failed to update receipt: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to update receipt: ${msg}`)
     }
   }
 
-  /**
-   * Delete a receipt
-   */
-  static async deleteReceipt(receiptId: string): Promise<void> {
-    if (!receiptId || typeof receiptId !== "string") {
-      throw new Error("Valid receiptId is required")
-    }
+  static async deleteReceipt(
+    getToken: () => Promise<string | null>,
+    receiptId: string
+  ): Promise<void> {
+    if (!receiptId) throw new Error("Valid receiptId is required")
 
     try {
-      await receiptRepository.deleteReceipt(receiptId)
-    } catch (error: any) {
+      await apiRequest(getToken, `/api/receipts/${receiptId}`, {
+        method: "DELETE",
+      })
+    } catch (error: unknown) {
       console.error("[ReceiptService] Error deleting receipt:", error)
-      throw new Error(`Failed to delete receipt: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to delete receipt: ${msg}`)
     }
   }
 
-  /**
-   * Get receipts for a specific product
-   */
-  static async getReceiptsByProduct(productId: string): Promise<Receipt[]> {
-    if (!productId || typeof productId !== "string") {
-      throw new Error("Valid productId is required")
-    }
+  static async getReceiptsByProduct(
+    getToken: () => Promise<string | null>,
+    productId: string
+  ): Promise<Receipt[]> {
+    if (!productId) throw new Error("Valid productId is required")
 
     try {
-      return await receiptRepository.getReceiptsByProduct(productId)
-    } catch (error: any) {
+      return await apiRequest<Receipt[]>(
+        getToken,
+        `/api/receipts/by-product/${encodeURIComponent(productId)}`
+      )
+    } catch (error: unknown) {
       console.error("[ReceiptService] Error fetching receipts by product:", error)
-      throw new Error(`Failed to fetch receipts: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch receipts: ${msg}`)
     }
   }
 }
-

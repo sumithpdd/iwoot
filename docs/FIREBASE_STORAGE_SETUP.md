@@ -77,10 +77,12 @@ Images are stored in Firebase Storage with this structure:
 ## Troubleshooting
 
 ### "Permission denied" when uploading
+- **See [FIREBASE_STORAGE_RULES_FIX.md](./FIREBASE_STORAGE_RULES_FIX.md) for step-by-step fix**
 - Check Storage security rules are published
 - Verify you're logged in
 - Check file size is under 5MB
 - Verify file is an image type
+- Wait 10-30 seconds after publishing rules for propagation
 
 ### Images not displaying
 - Check browser console for errors
@@ -92,4 +94,8 @@ Images are stored in Firebase Storage with this structure:
 - Verify Firebase Storage is enabled
 - Check file size (max 5MB)
 - Verify file is an image (jpg, png, gif, webp, etc.)
+
+### CORS errors when uploading from localhost
+- See [FIREBASE_STORAGE_CORS_FIX.md](./FIREBASE_STORAGE_CORS_FIX.md) for detailed instructions
+- Quick fix: Run `node setup-cors.js` (after installing @google-cloud/storage)
 

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Search, Loader2, CheckCircle2, XCircle } from "lucide-react"
 import { lookupProduct, lookupProductByUrl, ProductLookupResult } from "@/lib/services/product-lookup.service"
 import { useToast } from "@/hooks/use-toast"
+import { CopyToClipboardButton } from "@/components/copy-to-clipboard-button"
 
 interface ProductLookupProps {
   onProductFound: (product: ProductLookupResult) => void
@@ -127,9 +128,10 @@ export default function ProductLookup({ onProductFound, websiteUrl }: ProductLoo
               }
             }}
             placeholder="e.g., 'iPad Pro' or '0123456789012'"
-            className="flex-1 h-10"
+            className="h-10 min-w-0 flex-1"
             disabled={isSearching}
           />
+          <CopyToClipboardButton value={searchQuery} label="Search query" />
           <Button
             onClick={handleSearch}
             disabled={isSearching || !searchQuery.trim()}
@@ -155,6 +157,12 @@ export default function ProductLookup({ onProductFound, websiteUrl }: ProductLoo
           <Label className="text-sm text-gray-600 dark:text-gray-400">
             Or extract info from the website URL
           </Label>
+          <div className="flex gap-1 items-center rounded-md border border-gray-200 bg-white px-2 py-1.5 dark:border-gray-600 dark:bg-gray-950">
+            <span className="min-w-0 flex-1 truncate text-xs text-gray-700 dark:text-gray-300">
+              {websiteUrl}
+            </span>
+            <CopyToClipboardButton value={websiteUrl} label="Website URL" />
+          </div>
           <Button
             onClick={handleUrlLookup}
             disabled={isSearching || !websiteUrl}
@@ -189,4 +197,6 @@ export default function ProductLookup({ onProductFound, websiteUrl }: ProductLoo
     </div>
   )
 }
+
+
 

@@ -65,6 +65,26 @@ service cloud.firestore {
       // Allow delete if user owns the receipt
       allow delete: if isOwner(resource.data.userId);
     }
+
+    // Stores Collection (saved retailer / purchase profiles)
+    match /stores/{storeId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId)
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Brands Collection (saved manufacturer / label profiles)
+    match /brands/{brandId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId)
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner(resource.data.userId);
+    }
     
     // Users Collection (for future use)
     match /users/{userId} {
@@ -85,7 +105,7 @@ service cloud.firestore {
 ### Step 4: Test
 1. Refresh your application
 2. The permission errors should be gone
-3. You should be able to create and view products
+3. You should be able to create and view **products**, **receipts**, **stores**, and **brands** (each document must set `userId` to your Firebase Auth uid)
 
 ## For Development (Temporary - NOT for Production)
 

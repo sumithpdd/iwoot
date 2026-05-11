@@ -1,10 +1,5 @@
 /**
  * Custom Hook for Product Operations
- * 
- * Design Pattern: Custom Hooks Pattern
- * - Encapsulates product-related state and operations
- * - Provides a clean API for components
- * - Handles loading and error states
  */
 
 import { useState, useCallback } from "react"
@@ -30,6 +25,11 @@ export function useProducts(): UseProductsReturn {
   const [error, setError] = useState<string | null>(null)
   const [lastType, setLastType] = useState<ProductType | undefined>(undefined)
 
+  const getToken = useCallback(
+    () => user?.getIdToken() ?? Promise.resolve(null),
+    [user]
+  )
+
   const loadProducts = useCallback(async (type?: ProductType) => {
     if (!user) {
       setError("User not authenticated")
@@ -41,16 +41,16 @@ export function useProducts(): UseProductsReturn {
     setLastType(type)
 
     try {
-      const data = await ProductService.getProducts(user.uid, type)
+      const data = await ProductService.getProducts(getToken, type)
       setProducts(data)
-    } catch (err: any) {
-      const errorMessage = err.message || "Failed to load products"
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to load products"
       setError(errorMessage)
       console.error("[useProducts] Error loading products:", err)
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, getToken])
 
   const createProduct = useCallback(async (
     product: Omit<Product, "id" | "createdAt" | "updatedAt">
@@ -60,43 +60,40 @@ export function useProducts(): UseProductsReturn {
     }
 
     try {
-      const productId = await ProductService.createProduct({
+      const productId = await ProductService.createProduct(getToken, {
         ...product,
         userId: user.uid,
       })
-      // Reload products to include the new one
       await loadProducts(lastType)
       return productId
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[useProducts] Error creating product:", err)
       throw err
     }
-  }, [user, loadProducts, lastType])
+  }, [user, getToken, loadProducts, lastType])
 
   const updateProduct = useCallback(async (
     productId: string,
     updates: Partial<Omit<Product, "id" | "userId" | "createdAt">>
   ): Promise<void> => {
     try {
-      await ProductService.updateProduct(productId, updates)
-      // Reload products to reflect changes
+      await ProductService.updateProduct(getToken, productId, updates)
       await loadProducts(lastType)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[useProducts] Error updating product:", err)
       throw err
     }
-  }, [loadProducts, lastType])
+  }, [getToken, loadProducts, lastType])
 
   const deleteProduct = useCallback(async (productId: string): Promise<void> => {
     try {
-      await ProductService.deleteProduct(productId)
-      // Reload products to reflect deletion
+      await ProductService.deleteProduct(getToken, productId)
       await loadProducts(lastType)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[useProducts] Error deleting product:", err)
       throw err
     }
-  }, [loadProducts, lastType])
+  }, [getToken, loadProducts, lastType])
 
   const refreshProducts = useCallback(async () => {
     await loadProducts(lastType)
@@ -113,4 +110,3 @@ export function useProducts(): UseProductsReturn {
     refreshProducts,
   }
 }
-

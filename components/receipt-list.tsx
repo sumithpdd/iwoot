@@ -1,7 +1,9 @@
 "use client"
 
+import { useCallback } from "react"
 import { Receipt } from "@/lib/types/receipt"
-import { deleteReceipt } from "@/lib/firebase/receipts"
+import { ReceiptService } from "@/lib/services/receipt.service"
+import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Edit, Trash2, Receipt as ReceiptIcon } from "lucide-react"
@@ -20,6 +22,11 @@ export default function ReceiptList({
   onDelete,
 }: ReceiptListProps) {
   const { toast } = useToast()
+  const { user } = useAuth()
+  const getToken = useCallback(
+    () => user?.getIdToken() ?? Promise.resolve(null),
+    [user]
+  )
 
   const handleDelete = async (receiptId: string) => {
     if (!confirm("Are you sure you want to delete this receipt?")) {
@@ -27,7 +34,7 @@ export default function ReceiptList({
     }
 
     try {
-      await deleteReceipt(receiptId)
+      await ReceiptService.deleteReceipt(getToken, receiptId)
       toast({
         title: "Success",
         description: "Receipt deleted successfully",

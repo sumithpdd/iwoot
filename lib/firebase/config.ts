@@ -1,7 +1,5 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app"
 import { getAuth, Auth } from "firebase/auth"
-import { getFirestore, Firestore } from "firebase/firestore"
-import { getStorage, FirebaseStorage } from "firebase/storage"
 import { getAnalytics, Analytics } from "firebase/analytics"
 
 const firebaseConfig = {
@@ -16,12 +14,9 @@ const firebaseConfig = {
 
 let app: FirebaseApp | undefined
 let auth: Auth | undefined
-let db: Firestore | undefined
-let storage: FirebaseStorage | undefined
 let analytics: Analytics | null = null
 
 if (typeof window !== "undefined") {
-  // Check if Firebase config is complete
   if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
     console.error("Firebase configuration is missing. Please check your .env.local file.")
   } else {
@@ -32,10 +27,7 @@ if (typeof window !== "undefined") {
         app = getApps()[0]
       }
       auth = getAuth(app)
-      db = getFirestore(app)
-      storage = getStorage(app)
-      
-      // Initialize Analytics only in browser and if measurementId is provided
+
       if (firebaseConfig.measurementId) {
         try {
           analytics = getAnalytics(app)
@@ -49,10 +41,8 @@ if (typeof window !== "undefined") {
   }
 }
 
-// Helper function to check if Firebase is initialized
 export function isFirebaseInitialized(): boolean {
-  return typeof window !== "undefined" && !!auth && !!db
+  return typeof window !== "undefined" && !!auth
 }
 
-export { auth, db, storage, analytics }
-
+export { auth, analytics }

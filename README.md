@@ -68,6 +68,12 @@ service cloud.firestore {
       allow update: if isOwner(resource.data.userId) && request.resource.data.userId == request.auth.uid;
       allow delete: if isOwner(resource.data.userId);
     }
+    match /stores/{storeId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId) && request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner(resource.data.userId);
+    }
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
@@ -91,11 +97,15 @@ Open [http://localhost:3000](http://localhost:3000)
 - **"I Have One Of Those"**: Track products you own, record purchase prices, monitor current values
 
 ### Additional Features
-- 🤖 **Auto-fill product details** - Search online databases to automatically fill product information
-- 📸 Image uploads (Firebase Storage)
+- 🤖 **Auto-fill product details** — search by name/barcode or hints from URLs (UPCitemdb)
+- ✍️ **Rich descriptions** and optional **technical specifications** (great for resale listings)
+- 📸 **Multiple images** per product (Firebase Storage), reorder and tag
+- 🏪 **Stores** — saved retailer profiles linked to “I have” items
 - 📊 Price history tracking
 - 🧾 Receipt management
-- 🔍 Search functionality
+- ⚖️ **Sell compare** — static hub (`/sell-compare`) for rough marketplace price reference
+- 🧭 **Selling journey** card on the dashboard (stores → list item → compare → receipts)
+- 🔍 Search across names, specs, and plain text from descriptions
 - 📱 Responsive design
 - 🔐 Secure authentication
 
@@ -208,6 +218,12 @@ service cloud.firestore {
       allow update: if isOwner(resource.data.userId) && request.resource.data.userId == request.auth.uid;
       allow delete: if isOwner(resource.data.userId);
     }
+    match /stores/{storeId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId) && request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner(resource.data.userId);
+    }
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
@@ -283,7 +299,8 @@ vercel ls
 iwoot/
 ├── app/                    # Next.js App Router
 │   ├── admin/             # Admin dashboard
-│   ├── dashboard/         # Main dashboard
+│   ├── dashboard/         # Main dashboard (products, receipts, stores)
+│   ├── sell-compare/      # Static resale price compare pages
 │   ├── login/             # Login/Register
 │   └── layout.tsx         # Root layout
 │
@@ -292,9 +309,12 @@ iwoot/
 │   ├── product-dialog.tsx
 │   ├── product-list.tsx
 │   ├── receipt-dialog.tsx
+│   ├── selling-journey-card.tsx
+│   ├── selling-venue-price-grid.tsx
 │   └── search-bar.tsx
 │
 ├── lib/                  # Utilities
+│   ├── data/            # Static data (e.g. sell-compare venue rows)
 │   ├── firebase/        # Firebase config & operations
 │   ├── services/        # Business logic layer
 │   ├── validators/      # Validation schemas
@@ -380,6 +400,7 @@ npm install
 - `docs/FIRESTORE_RULES.md` - Security rules explanation
 - `docs/FIREBASE_STORAGE_SETUP.md` - Storage setup guide
 - `docs/PRODUCT_LOOKUP.md` - Product auto-fill feature guide
+- `docs/SELLING_AND_COMPARE.md` - Resale journey, compare pages, related code paths
 - `docs/DEPLOYMENT.md` - Vercel deployment instructions
 
 ## 🔒 Security Notes

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Search, X } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { CopyToClipboardButton } from "@/components/copy-to-clipboard-button"
 
 interface SearchBarProps {
   value: string
@@ -37,18 +38,27 @@ export default function SearchBar({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
-          className="pl-10 pr-10 py-6 text-base border-0 focus-visible:ring-0 bg-transparent"
+          className={`pl-10 py-6 text-base border-0 focus-visible:ring-0 bg-transparent ${
+            value ? "pr-20" : "pr-10"
+          }`}
         />
         {value && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onChange("")}
-            className="absolute right-1 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="absolute right-1 flex items-center gap-0.5">
+            <CopyToClipboardButton
+              value={value}
+              label="Search query"
+              className="h-8 w-8"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange("")}
+              className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </div>
     </div>

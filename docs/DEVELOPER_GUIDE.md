@@ -161,20 +161,20 @@ const onSubmit = (data) => {
 
 ### `/app/dashboard/page.tsx`
 
-**Purpose**: Main dashboard showing products
+**Purpose**: Main authenticated hub after login
 
 **Key Points**:
-- Uses `useAuth()` hook
-- Fetches products from Firestore
-- Shows tabs for "Want" vs "Have"
-- Opens dialog to add/edit products
+- Uses `useAuth()`; loads **products**, **receipts**, and **stores** via respective services
+- **Tabs** (controlled `activeTab`): **Products**, **Receipts**, **Stores** — so programmatic tab switches (e.g. from `SellingJourneyCard`) stay in sync with the UI
+- Products: filters (all / want / have), **search** (plain text from HTML descriptions + specification map), sort, price band, **grid or table** view
+- **SellingJourneyCard**: Short guided path for resale (add store, add “I have” product, open compare hub, receipts)
+- Top nav: **Sell compare** → `/sell-compare`
+- Opens **ProductDialog**, **ReceiptDialog**, **StoreDialog** as needed
 
 **Data Flow**:
-1. Component mounts
-2. Checks if user is authenticated
-3. Fetches products for that user
-4. Displays products in cards
-5. User can add/edit/delete products
+1. Mount → require user → load products, receipts, stores
+2. User switches tabs or uses journey card actions
+3. List components render data; dialogs persist changes through API services
 
 ### `/lib/firebase/config.ts`
 
@@ -241,13 +241,25 @@ if (!user) return <Login />
 
 ### `/components/product-dialog.tsx`
 
-**Purpose**: Form to add/edit products
+**Purpose**: Form to add/edit products (want and have)
 
 **Key Points**:
-- Uses React Hook Form
-- Validates with Zod
-- Handles both create and update
-- Includes ProductLookup component for auto-filling product details
+- React Hook Form + Zod (`wantProductSchema` / `haveProductSchema`)
+- **ProductLookup** when creating (barcode/name; can fill description + `specifications`)
+- **Rich text** description (`RichTextEditor`, TipTap); HTML stored, **sanitized** when shown in lists via `ProductDescriptionDisplay`
+- **ProductSpecificationsEditor** for optional spec map
+- **ImageUpload** (Firebase Storage, `products` folder); `sanitizeImageEntriesForSave` on submit
+- **Have** only: `storeId` select + inline **StoreDialog**; purchase fields; **isSelling** / **sellingOn** with copy linking to `/sell-compare`
+- Edit mode: **Tabs** for **Details** vs **Price history** (`PriceHistoryComponent`)
+- Keyboard: **Ctrl+Enter** / **⌘+Enter** submits from the form
+
+### `/app/sell-compare/page.tsx` and `/app/sell-compare/.../page.tsx`
+
+**Purpose**: Static **resale price compare** routes (no server scrape). Hub lists comparison pages; each page uses `SellingVenuePriceGrid` fed from **`lib/data/*.ts`** (e.g. `airpods-pro-2-venue-prices.ts`). Update rows and `lastCheckedIso` manually when refreshing reference prices.
+
+### `/components/selling-journey-card.tsx`
+
+**Purpose**: Dashboard onboarding card with actions that set `activeTab` and open dialogs (`onOpenAddStore`, `onOpenHaveProduct`, etc.).
 
 ### `/components/product-lookup.tsx`
 

@@ -1,10 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { collection, getDocs, query, where } from "firebase/firestore"
-import { db } from "@/lib/firebase/config"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
@@ -30,33 +28,32 @@ export default function AdminPage() {
     }
   }, [user, authLoading, router])
 
-  useEffect(() => {
-    if (user) {
-      loadUsers()
-    }
-  }, [user])
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true)
-      // Note: In a real app, you'd want to check if user is admin
-      // For now, we'll just show all users
-      if (!db) {
-        throw new Error("Firestore database not initialized")
+      const token = await user?.getIdToken()
+      if (!token) throw new Error("Not authenticated")
+      const res = await fetch("/api/admin/users", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || res.statusText)
       }
-      const q = query(collection(db, "users"))
-      const snapshot = await getDocs(q)
-      const usersData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as User[]
+      const usersData = (await res.json()) as User[]
       setUsers(usersData)
     } catch (error) {
       console.error("Error loading users:", error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (user) {
+      loadUsers()
+    }
+  }, [user, loadUsers])
 
   if (authLoading || loading) {
     return (

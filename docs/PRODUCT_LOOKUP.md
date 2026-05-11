@@ -33,7 +33,8 @@ You'll see an **Auto-Fill Product Details** section at the top of the form (only
 3. If found, the form will automatically fill in:
    - Product Name
    - Brand
-   - Description
+   - Description (may be HTML when the catalog provides rich text)
+   - Technical **specifications** (key/value map), when returned by the catalog layer
    - Category
    - Model
    - SKU (if available)
@@ -53,8 +54,8 @@ After the lookup:
 - ✅ Review all auto-filled fields
 - ✅ Adjust any incorrect information
 - ✅ Fill in any missing required fields
-- ✅ Add additional details (color, size, notes, etc.)
-- ✅ Upload or adjust product images
+- ✅ Add additional details (color, size, notes, rich description, extra spec rows, etc.)
+- ✅ Upload or adjust product images (first image is the main thumbnail in lists)
 
 ### Step 4: Save Product
 
@@ -169,4 +170,6 @@ If you encounter issues with the product lookup feature:
 2. Try a different search term
 3. Fill in product details manually
 4. Report issues if the feature consistently fails
+
+
 

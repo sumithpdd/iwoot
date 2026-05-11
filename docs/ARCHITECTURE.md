@@ -16,16 +16,22 @@ This document explains the architecture, design patterns, and code organization 
 iwoot/
 ├── app/                    # Next.js App Router (pages)
 │   ├── api/               # API routes
-│   ├── dashboard/         # Dashboard page
+│   ├── dashboard/         # Dashboard (products, receipts, stores tabs)
+│   ├── sell-compare/      # Static resale price compare hub + product pages
 │   ├── login/             # Login page
 │   ├── admin/             # Admin page
 │   └── layout.tsx         # Root layout
 │
 ├── components/            # React components
 │   ├── ui/               # Reusable UI components (shadcn/ui)
-│   ├── product-dialog.tsx # Product form dialog
+│   ├── product-dialog.tsx # Product form (lookup, rich text, specs, images, selling)
 │   ├── product-list.tsx  # Product list display
 │   ├── product-lookup.tsx # Product search and auto-fill component
+│   ├── selling-journey-card.tsx
+│   ├── selling-venue-price-grid.tsx
+│   ├── rich-text-editor.tsx
+│   ├── product-description-display.tsx
+│   ├── product-specifications-editor.tsx
 │   └── ...
 │
 ├── lib/                   # Core libraries and utilities
@@ -35,9 +41,11 @@ iwoot/
 │   │   ├── receipts.ts   # Receipt CRUD operations
 │   │   └── storage.ts    # Image upload operations
 │   │
+│   ├── data/             # Static reference data (e.g. sell-compare venue rows)
 │   ├── services/         # Business Logic Layer
 │   │   ├── product.service.ts
 │   │   ├── receipt.service.ts
+│   │   ├── store.service.ts
 │   │   └── product-lookup.service.ts  # Product lookup from external APIs
 │   │
 │   ├── validators/        # Validation logic
@@ -49,7 +57,8 @@ iwoot/
 │   │
 │   ├── types/            # TypeScript type definitions
 │   │   ├── product.ts
-│   │   └── receipt.ts
+│   │   ├── receipt.ts
+│   │   └── store.ts
 │   │
 │   └── utils.ts          # Utility functions
 │

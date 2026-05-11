@@ -45,6 +45,20 @@ import { deleteProduct } from "@/lib/firebase/products"
 await deleteProduct(productId)
 ```
 
+## Product descriptions (HTML) and specs
+
+- **Sanitize for display**: `import { sanitizeProductHtml } from "@/lib/utils/sanitize-product-html"`
+- **Plain text for search or previews**: `import { htmlToPlainText } from "@/lib/utils/html-plain-text"`
+- **List / card snippet**: `import { ProductDescriptionDisplay } from "@/components/product-description-display"`
+
+Product validation for long HTML and spec maps: `lib/validators/product.validator.ts` (`validateDescriptionAndSpecs`).
+
+## Sell compare (static pages)
+
+- **Hub**: `/sell-compare`
+- **Example product page**: `/sell-compare/airpods-pro-2`
+- **Data**: `lib/data/airpods-pro-2-venue-prices.ts` — edit `AIRPODS_PRO_2_VENUE_ROWS` to change venue URLs, GBP amounts, and notes.
+
 ## Product Lookup
 
 ### Search Product by Name or Barcode

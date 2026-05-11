@@ -48,6 +48,22 @@ Complete guide to all documentation files in the IWOOT project.
    - Quick lookup
    - Examples
 
+## 🛒 Products & resale
+
+**Product data and second-hand workflows:**
+
+1. **`docs/PRODUCT_LOOKUP.md`** - Product auto-fill feature
+   - Search by name or barcode
+   - Extract info from URLs
+   - Troubleshooting
+
+2. **`docs/SELLING_AND_COMPARE.md`** - Resale journey & price compare
+   - Dashboard selling journey card
+   - Stores, “I have” products, images, listing fields
+   - `/sell-compare` hub and static venue data
+
+3. **`docs/FIRESTORE_PRODUCT_EXAMPLE.md`** - Example `products` document (field shapes, legacy `images`)
+
 ## 🔐 Security & Configuration
 
 **Security and setup guides:**
@@ -73,12 +89,6 @@ Complete guide to all documentation files in the IWOOT project.
    - Security rules
    - Image upload guide
 
-5. **`docs/PRODUCT_LOOKUP.md`** - Product auto-fill feature
-   - How to use product lookup
-   - Search by name or barcode
-   - Extract info from URLs
-   - Troubleshooting
-
 ## 📋 Project Information
 
 1. **`docs/PROJECT_OVERVIEW.md`** - Project overview
@@ -100,6 +110,8 @@ docs/
 ├── FIREBASE_SETUP.md          # Firebase config
 ├── FIREBASE_STORAGE_SETUP.md  # Storage setup
 ├── PRODUCT_LOOKUP.md          # Product auto-fill feature
+├── SELLING_AND_COMPARE.md     # Marketplace selling UX & compare pages
+├── FIRESTORE_PRODUCT_EXAMPLE.md # Example product document shape
 ├── DEPLOYMENT.md              # Vercel deployment guide
 ├── VERCEL_ENV_SETUP.md        # Vercel environment variables
 └── PROJECT_OVERVIEW.md        # Project info
@@ -120,6 +132,10 @@ Root:
 - **Find code examples** → `docs/QUICK_REFERENCE.md`
 - **Set up Firebase** → `docs/FIREBASE_SETUP.md`
 - **Upload images** → `docs/FIREBASE_STORAGE_SETUP.md`
+- **Product lookup / auto-fill** → `docs/PRODUCT_LOOKUP.md`
+- **Sell on marketplaces / price compare** → `docs/SELLING_AND_COMPARE.md`
+- **API 401 / verifyIdToken / service account** → `docs/FIREBASE_SERVICE_ACCOUNT_SETUP.md` (API routes section)
+- **Firestore product field shapes** → `docs/FIRESTORE_PRODUCT_EXAMPLE.md`
 
 ## 📝 Documentation Standards
 

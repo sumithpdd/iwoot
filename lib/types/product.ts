@@ -1,19 +1,38 @@
 export type ProductType = "want" | "have"
 
+/** Resale / listing lifecycle for “I have” items */
+export type ListingStatus = "not_listed" | "selling" | "sold"
+
+/** One product photo; legacy docs may still store plain URL strings in `images`. */
+export interface ProductImageEntry {
+  url: string
+  tags?: string[]
+}
+
 export interface BaseProduct {
   id?: string
   name: string
   brand: string
+  /** Optional link to a `brands` profile (same pattern as `storeId` for stores) */
+  brandId?: string | null
   website: string
   originalPrice: number
+  /** Purchase or listing date (from the form) */
   date: string // ISO date string
   userId: string
   createdAt?: string
   updatedAt?: string
+  /** Set by API from signed-in user when the row is created */
+  createdByEmail?: string
+  /** Set by API from signed-in user on each update */
+  updatedByEmail?: string
   // Extended attributes
+  /** Rich text (HTML); sanitized when rendered */
   description?: string
   category?: string
-  images?: string[] // Array of image URLs
+  /** Image URLs with optional per-image tags (legacy: array of URL strings). */
+  images?: ProductImageEntry[]
+
   specifications?: Record<string, string> // Key-value pairs for specs
   model?: string
   sku?: string
@@ -34,11 +53,23 @@ export interface HaveProduct extends BaseProduct {
   type: "have"
   priceBought: number
   priceHistory?: PriceHistory[]
+  /** Saved store profile (see /api/stores); `null` on PATCH clears */
+  storeId?: string | null
   purchaseLocation?: string
   warrantyExpiry?: string
   receiptId?: string // Link to receipt if purchased with receipt
-  isSelling?: boolean // Whether the product is currently being sold
-  sellingOn?: string // Platform where it's being sold (e.g., "Gumtree", "eBay", "Facebook Marketplace")
+  /** Where the item is or was listed (marketplaces, classifieds, etc.) */
+  listingPlatforms?: string[]
+  /** not_listed → selling → sold */
+  listingStatus?: ListingStatus
+  /** ISO date string when the item sold */
+  soldAt?: string
+  /** Free text: platform or buyer channel when sold */
+  soldWhere?: string
+  /** @deprecated Old UI — prefer `listingStatus` + `listingPlatforms` */
+  isSelling?: boolean
+  /** @deprecated Old UI — prefer `listingPlatforms` */
+  sellingOn?: string
 }
 
 export interface PriceHistory {

@@ -57,6 +57,10 @@ export function validateReceipt(
     errors.push("Receipt image must be a valid URL")
   }
 
+  if (receipt.storeWebsite?.trim() && !isValidUrl(receipt.storeWebsite.trim())) {
+    errors.push("Store website must be a valid URL")
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -104,6 +108,24 @@ export function validateReceiptUpdate(
 
   if (updates.receiptImage !== undefined && updates.receiptImage && !isValidUrl(updates.receiptImage)) {
     errors.push("Receipt image must be a valid URL")
+  }
+
+  if (
+    updates.storeWebsite !== undefined &&
+    updates.storeWebsite &&
+    typeof updates.storeWebsite === "string" &&
+    updates.storeWebsite.trim() &&
+    !isValidUrl(updates.storeWebsite.trim())
+  ) {
+    errors.push("Store website must be a valid URL")
+  }
+
+  if (
+    updates.storeId !== undefined &&
+    updates.storeId !== null &&
+    (typeof updates.storeId !== "string" || !updates.storeId.trim())
+  ) {
+    errors.push("Invalid store ID")
   }
 
   return {

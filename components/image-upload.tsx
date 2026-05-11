@@ -1,31 +1,49 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useCallback, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Upload, X, Image as ImageIcon } from "lucide-react"
+import { Upload, X, Image as ImageIcon, ChevronUp, ChevronDown } from "lucide-react"
 import Image from "next/image"
+import { useAuth } from "@/lib/auth-context"
+import { uploadImagesViaApi, deleteImageViaApi } from "@/lib/api/storage-client"
+import type { ProductImageEntry } from "@/lib/types/product"
 
-interface ImageUploadProps {
-  images: string[]
-  onImagesChange: (images: string[]) => void
+const MAX_TAG_LEN = 50
+const MAX_TAGS = 20
+
+export interface ImageUploadProps {
+  images: ProductImageEntry[]
+  onImagesChange: (images: ProductImageEntry[]) => void
   maxImages?: number
   folder: "products" | "receipts"
   userId: string
   disabled?: boolean
+  /** Per-image tags (e.g. product photos only) */
+  allowTags?: boolean
+  /** Move first / last / between */
+  allowReorder?: boolean
 }
 
 export default function ImageUpload({
   images,
   onImagesChange,
-  maxImages = 5,
+  maxImages = 12,
   folder,
-  userId,
+  userId: _userId,
   disabled = false,
+  allowTags = true,
+  allowReorder = true,
 }: ImageUploadProps) {
+  const { user } = useAuth()
+  const getToken = useCallback(
+    () => user?.getIdToken() ?? Promise.resolve(null),
+    [user]
+  )
   const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState<Record<number, number>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [tagDraft, setTagDraft] = useState<Record<number, string>>({})
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -42,13 +60,13 @@ export default function ImageUpload({
     setUploading(true)
 
     try {
-      const { uploadImages } = await import("@/lib/firebase/storage")
-      const newUrls = await uploadImages(fileArray, userId, folder)
-      
-      onImagesChange([...images, ...newUrls])
-    } catch (error: any) {
+      const newUrls = await uploadImagesViaApi(getToken, fileArray, folder)
+      const additions: ProductImageEntry[] = newUrls.map((url) => ({ url, tags: [] }))
+      onImagesChange([...images, ...additions])
+    } catch (error: unknown) {
       console.error("Upload error:", error)
-      alert(`Failed to upload images: ${error.message}`)
+      const msg = error instanceof Error ? error.message : "Upload failed"
+      alert(`Failed to upload images: ${msg}`)
     } finally {
       setUploading(false)
       if (fileInputRef.current) {
@@ -58,21 +76,53 @@ export default function ImageUpload({
   }
 
   const handleRemoveImage = async (index: number) => {
-    const imageUrl = images[index]
-    
-    // If it's a Firebase Storage URL, delete it from storage
+    const imageUrl = images[index]?.url
+    if (!imageUrl) return
+
     if (imageUrl.includes("firebasestorage.googleapis.com")) {
       try {
-        const { deleteImage } = await import("@/lib/firebase/storage")
-        await deleteImage(imageUrl)
+        await deleteImageViaApi(getToken, imageUrl)
       } catch (error) {
         console.error("Failed to delete image from storage:", error)
-        // Continue to remove from UI even if storage delete fails
       }
     }
 
     const newImages = images.filter((_, i) => i !== index)
     onImagesChange(newImages)
+    setTagDraft({})
+  }
+
+  const move = (from: number, dir: -1 | 1) => {
+    const to = from + dir
+    if (to < 0 || to >= images.length) return
+    const next = [...images]
+    const [row] = next.splice(from, 1)
+    next.splice(to, 0, row)
+    onImagesChange(next)
+  }
+
+  const addTag = (index: number, raw: string) => {
+    const t = raw.trim().slice(0, MAX_TAG_LEN)
+    if (!t) return
+    const entry = images[index]
+    if (!entry) return
+    const existing = entry.tags || []
+    if (existing.includes(t) || existing.length >= MAX_TAGS) return
+    const next = [...images]
+    next[index] = { ...entry, tags: [...existing, t] }
+    onImagesChange(next)
+    setTagDraft((d) => ({ ...d, [index]: "" }))
+  }
+
+  const removeTag = (index: number, tag: string) => {
+    const entry = images[index]
+    if (!entry?.tags) return
+    const next = [...images]
+    next[index] = {
+      ...entry,
+      tags: entry.tags.filter((x) => x !== tag),
+    }
+    onImagesChange(next)
   }
 
   const handleAddUrl = () => {
@@ -82,50 +132,146 @@ export default function ImageUpload({
         alert(`You can only have ${maxImages} images`)
         return
       }
-      onImagesChange([...images, url.trim()])
+      onImagesChange([...images, { url: url.trim(), tags: [] }])
     }
   }
 
   return (
     <div className="space-y-2">
-      <Label>Images</Label>
-      <div className="space-y-2">
-        {/* Image Preview Grid */}
+      <div>
+        <Label>Images</Label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Drag in files or add a URL. Reorder so your best photo is first. Optional tags help you remember (e.g.
+          &quot;serial&quot;, &quot;defect&quot;).
+        </p>
+      </div>
+      <div className="space-y-3">
         {images.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {images.map((imageUrl, index) => (
-              <div key={index} className="relative group">
-                <div className="relative aspect-square rounded-md overflow-hidden border border-gray-200 bg-gray-100">
-                  <Image
-                    src={imageUrl}
-                    alt={`Image ${index + 1}`}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.style.display = "none"
-                    }}
-                  />
-                  {!disabled && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(index)}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      aria-label="Remove image"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {images.map((entry, index) => (
+              <div
+                key={`${entry.url}-${index}`}
+                className="flex flex-col gap-2 rounded-lg border border-border bg-card p-2"
+              >
+                <div className="relative flex gap-2">
+                  <div className="relative aspect-square w-28 shrink-0 overflow-hidden rounded-md border bg-muted">
+                    <Image
+                      src={entry.url}
+                      alt={entry.tags?.[0] || `Image ${index + 1}`}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = "none"
+                      }}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col justify-between gap-1">
+                    <p className="truncate text-xs text-muted-foreground" title={entry.url}>
+                      {entry.url}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {allowReorder && !disabled && images.length > 1 && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={index === 0}
+                            onClick={() => move(index, -1)}
+                            aria-label="Move image up"
+                          >
+                            <ChevronUp className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={index === images.length - 1}
+                            onClick={() => move(index, 1)}
+                            aria-label="Move image down"
+                          >
+                            <ChevronDown className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
+                      {!disabled && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => void handleRemoveImage(index)}
+                        >
+                          <X className="mr-1 h-3 w-3" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
+                {allowTags && (
+                  <div className="space-y-1 border-t border-border pt-2">
+                    <Label className="text-xs text-muted-foreground">Tags (optional)</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {(entry.tags || []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs"
+                        >
+                          {tag}
+                          {!disabled && (
+                            <button
+                              type="button"
+                              onClick={() => removeTag(index, tag)}
+                              className="rounded hover:bg-destructive/20"
+                              aria-label={`Remove tag ${tag}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                    {!disabled && (
+                      <div className="flex gap-1">
+                        <Input
+                          placeholder="Add tag, press Enter"
+                          value={tagDraft[index] ?? ""}
+                          onChange={(e) =>
+                            setTagDraft((d) => ({ ...d, [index]: e.target.value }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault()
+                              addTag(index, tagDraft[index] ?? "")
+                            }
+                          }}
+                          className="h-8 text-xs"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="h-8 shrink-0 text-xs"
+                          onClick={() => addTag(index, tagDraft[index] ?? "")}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
 
-        {/* Upload Controls */}
         {!disabled && images.length < maxImages && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
@@ -134,7 +280,7 @@ export default function ImageUpload({
               className="flex items-center gap-2"
             >
               <Upload className="h-4 w-4" />
-              {uploading ? "Uploading..." : "Upload Images"}
+              {uploading ? "Uploading…" : "Upload images"}
             </Button>
             <Button
               type="button"
@@ -159,16 +305,14 @@ export default function ImageUpload({
         )}
 
         {images.length >= maxImages && !disabled && (
-          <p className="text-sm text-gray-500">
-            Maximum {maxImages} images reached
-          </p>
+          <p className="text-sm text-muted-foreground">Maximum {maxImages} images reached.</p>
         )}
 
-        <p className="text-xs text-gray-500">
-          Upload images from your device or add image URLs. Max {maxImages} images, 5MB per file.
+        <p className="text-xs text-muted-foreground">
+          Upload from device or paste URLs. Firebase Storage files are removed when you delete a
+          thumbnail. Max {maxImages} images, 5MB per file.
         </p>
       </div>
     </div>
   )
 }
-

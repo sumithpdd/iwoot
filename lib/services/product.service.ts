@@ -1,153 +1,133 @@
 /**
- * Product Service Layer
- * 
- * This service layer provides a clean abstraction for product operations.
- * It handles business logic, validation, and error handling.
- * 
- * Design Pattern: Service Layer Pattern
- * - Separates business logic from UI components
- * - Provides a single source of truth for product operations
- * - Makes testing easier
- * - Improves code reusability
+ * Product Service — calls secured REST APIs (Firestore via Firebase Admin only on server).
  */
 
 import { Product, ProductType } from "@/lib/types/product"
-import * as productRepository from "@/lib/firebase/products"
+import { apiRequest } from "@/lib/api/http"
 import { validateProduct, validateProductUpdate } from "@/lib/validators/product.validator"
 
 export class ProductService {
-  /**
-   * Get all products for a user
-   * @param userId - The user ID
-   * @param type - Optional product type filter
-   * @returns Array of products
-   */
-  static async getProducts(userId: string, type?: ProductType): Promise<Product[]> {
-    if (!userId || typeof userId !== "string") {
-      throw new Error("Valid userId is required")
-    }
-
+  static async getProducts(
+    getToken: () => Promise<string | null>,
+    type?: ProductType
+  ): Promise<Product[]> {
+    const qs =
+      type === "want" || type === "have"
+        ? `?type=${encodeURIComponent(type)}`
+        : ""
     try {
-      return await productRepository.getProducts(userId, type)
-    } catch (error: any) {
+      return await apiRequest<Product[]>(getToken, `/api/products${qs}`)
+    } catch (error: unknown) {
       console.error("[ProductService] Error fetching products:", error)
-      throw new Error(`Failed to fetch products: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch products: ${msg}`)
     }
   }
 
-  /**
-   * Get a single product by ID
-   * @param productId - The product ID
-   * @returns Product or null if not found
-   */
-  static async getProduct(productId: string): Promise<Product | null> {
-    if (!productId || typeof productId !== "string") {
-      throw new Error("Valid productId is required")
-    }
-
+  static async getProduct(
+    getToken: () => Promise<string | null>,
+    productId: string
+  ): Promise<Product | null> {
+    if (!productId) throw new Error("Valid productId is required")
     try {
-      return await productRepository.getProduct(productId)
-    } catch (error: any) {
+      return await apiRequest<Product>(getToken, `/api/products/${productId}`)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error)
+      if (msg.includes("404") || msg.toLowerCase().includes("not found")) {
+        return null
+      }
       console.error("[ProductService] Error fetching product:", error)
-      throw new Error(`Failed to fetch product: ${error.message}`)
+      throw new Error(`Failed to fetch product: ${msg}`)
     }
   }
 
-  /**
-   * Create a new product
-   * @param productData - Product data (without id, createdAt, updatedAt)
-   * @returns The created product ID
-   */
   static async createProduct(
+    getToken: () => Promise<string | null>,
     productData: Omit<Product, "id" | "createdAt" | "updatedAt">
   ): Promise<string> {
-    // Validate product data
     const validation = validateProduct(productData)
     if (!validation.valid) {
       throw new Error(`Validation failed: ${validation.errors.join(", ")}`)
     }
 
     try {
-      return await productRepository.createProduct(productData)
-    } catch (error: any) {
+      const res = await apiRequest<{ id: string }>(getToken, "/api/products", {
+        method: "POST",
+        body: JSON.stringify(productData),
+      })
+      return res.id
+    } catch (error: unknown) {
       console.error("[ProductService] Error creating product:", error)
-      throw new Error(`Failed to create product: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to create product: ${msg}`)
     }
   }
 
-  /**
-   * Update an existing product
-   * @param productId - The product ID
-   * @param updates - Partial product data to update
-   */
   static async updateProduct(
+    getToken: () => Promise<string | null>,
     productId: string,
     updates: Partial<Omit<Product, "id" | "userId" | "createdAt">>
   ): Promise<void> {
-    if (!productId || typeof productId !== "string") {
-      throw new Error("Valid productId is required")
-    }
+    if (!productId) throw new Error("Valid productId is required")
 
-    // Validate updates
     const validation = validateProductUpdate(updates)
     if (!validation.valid) {
       throw new Error(`Validation failed: ${validation.errors.join(", ")}`)
     }
 
     try {
-      await productRepository.updateProduct(productId, updates)
-    } catch (error: any) {
+      await apiRequest(getToken, `/api/products/${productId}`, {
+        method: "PATCH",
+        body: JSON.stringify(updates),
+      })
+    } catch (error: unknown) {
       console.error("[ProductService] Error updating product:", error)
-      throw new Error(`Failed to update product: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to update product: ${msg}`)
     }
   }
 
-  /**
-   * Delete a product
-   * @param productId - The product ID
-   */
-  static async deleteProduct(productId: string): Promise<void> {
-    if (!productId || typeof productId !== "string") {
-      throw new Error("Valid productId is required")
-    }
+  static async deleteProduct(
+    getToken: () => Promise<string | null>,
+    productId: string
+  ): Promise<void> {
+    if (!productId) throw new Error("Valid productId is required")
 
     try {
-      await productRepository.deleteProduct(productId)
-    } catch (error: any) {
+      await apiRequest(getToken, `/api/products/${productId}`, {
+        method: "DELETE",
+      })
+    } catch (error: unknown) {
       console.error("[ProductService] Error deleting product:", error)
-      throw new Error(`Failed to delete product: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to delete product: ${msg}`)
     }
   }
 
-  /**
-   * Add price history entry to a product
-   * @param productId - The product ID
-   * @param price - The price
-   * @param date - The date (ISO string)
-   * @param storeName - Optional store name
-   * @param notes - Optional notes
-   */
   static async addPriceHistory(
+    getToken: () => Promise<string | null>,
     productId: string,
     price: number,
-    date: string,
+    _date: string,
     storeName?: string,
     notes?: string
   ): Promise<void> {
-    if (!productId || typeof productId !== "string") {
-      throw new Error("Valid productId is required")
-    }
-
-    if (price <= 0) {
-      throw new Error("Price must be greater than 0")
-    }
+    if (!productId) throw new Error("Valid productId is required")
+    if (price <= 0) throw new Error("Price must be greater than 0")
 
     try {
-      await productRepository.addPriceHistory(productId, price, storeName || "Unknown Store")
-    } catch (error: any) {
+      await apiRequest(getToken, `/api/products/${productId}/price-history`, {
+        method: "POST",
+        body: JSON.stringify({
+          price,
+          website: storeName || "Unknown Store",
+          notes,
+        }),
+      })
+    } catch (error: unknown) {
       console.error("[ProductService] Error adding price history:", error)
-      throw new Error(`Failed to add price history: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to add price history: ${msg}`)
     }
   }
 }
-

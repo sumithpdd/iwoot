@@ -156,6 +156,12 @@ service cloud.firestore {
       allow update: if isOwner(resource.data.userId) && request.resource.data.userId == request.auth.uid;
       allow delete: if isOwner(resource.data.userId);
     }
+    match /stores/{storeId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId) && request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner(resource.data.userId);
+    }
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
@@ -165,6 +171,8 @@ service cloud.firestore {
 
 4. Click **Publish**
 5. Wait for "Rules published successfully" message
+
+**Stores:** each document in `stores` must include `userId` (same pattern as `products` and `receipts`) so these rules apply.
 
 ## Step 8: Set Storage Security Rules
 

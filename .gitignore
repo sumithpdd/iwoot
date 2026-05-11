@@ -28,9 +28,18 @@ yarn-error.log*
 .env*.local
 .env
 
+# Firebase / GCP credentials (NEVER commit these)
+firebase-service-account.json
+*-firebase-adminsdk-*.json
+*-service-account.json
+iwoot-service-account.json
+firebase-keys/
+**/firebase-keys/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.firebaserc
