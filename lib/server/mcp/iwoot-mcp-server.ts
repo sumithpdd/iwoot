@@ -6,6 +6,11 @@ import {
   getSellComparePageBySlug,
   listSellComparePages,
 } from "@/lib/server/repositories/sell-compare.repository"
+import {
+  LIVE_LISTING_PLATFORMS,
+  recordLiveListing,
+  updateProductListingStatus,
+} from "@/lib/server/resale/record-live-listing"
 import type { HaveProduct, Product } from "@/lib/types/product"
 import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
 import { htmlToPlainText } from "@/lib/utils/html-plain-text"
@@ -170,6 +175,46 @@ export function createIwootMcpServer(uid: string): McpServer {
         .filter(Boolean)
         .join("\n\n")
       return textResult({ productId: product.id, platform, title, body })
+    }
+  )
+
+  server.registerTool(
+    "record_live_listing",
+    {
+      description:
+        "After you post on Gumtree/Shpock/etc., record the live ad URL and asking price: mark the have product selling, append notes, and add a “Your live listing” row on sell-compare.",
+      inputSchema: {
+        query: z.string().describe("Product name or Firestore id"),
+        platform: z.enum(LIVE_LISTING_PLATFORMS),
+        url: z.string().url(),
+        priceGbp: z.number().nonnegative(),
+        sellCompareSlug: z.string().optional(),
+        location: z.string().optional(),
+        notes: z.string().optional(),
+        setWebsite: z.boolean().optional(),
+      },
+    },
+    async (args) => {
+      const result = await recordLiveListing(uid, args)
+      return textResult(result, !result.ok)
+    }
+  )
+
+  server.registerTool(
+    "update_listing_status",
+    {
+      description:
+        "Set listingStatus on a have product: not_listed | selling | sold.",
+      inputSchema: {
+        query: z.string(),
+        listingStatus: z.enum(["not_listed", "selling", "sold"]),
+        soldWhere: z.string().optional(),
+        soldAt: z.string().optional(),
+      },
+    },
+    async (args) => {
+      const result = await updateProductListingStatus(uid, args)
+      return textResult(result, !result.ok)
     }
   )
 

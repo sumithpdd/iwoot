@@ -95,3 +95,55 @@ export async function upsertSellComparePage(
     { merge: true }
   )
 }
+
+/**
+ * Insert or replace a “your live listing” venue row.
+ * Live Gumtree/Shpock rows stay at the top; drops prior row with same id/url
+ * and generic same-venue search rows (null price) when replacing with a live ask.
+ */
+export async function upsertLiveVenueRow(
+  slug: string,
+  venue: VenuePriceRow
+): Promise<void> {
+  const db = getAdminFirestore()
+  const ref = db.collection(COLLECTION).doc(slug)
+  const snap = await ref.get()
+  if (!snap.exists) {
+    throw new Error(`sellComparePages/${slug} not found`)
+  }
+  const data = snap.data() as Record<string, unknown>
+  const existing = Array.isArray(data.venues)
+    ? ([...data.venues] as VenuePriceRow[])
+    : []
+
+  const venueKey = venue.venue.toLowerCase()
+  const filtered = existing.filter((v) => {
+    if (v.id === venue.id || v.url === venue.url) return false
+    if (
+      v.venue.toLowerCase() === venueKey &&
+      v.priceGbp == null &&
+      !String(v.id).includes("live-own")
+    ) {
+      return false
+    }
+    return true
+  })
+
+  const liveOwn = filtered.filter((v) => String(v.id).endsWith("-live-own"))
+  const rest = filtered.filter((v) => !String(v.id).endsWith("-live-own"))
+  const withoutNew = liveOwn.filter((v) => v.id !== venue.id)
+  const nextLive = [venue, ...withoutNew].sort((a, b) => {
+    const rank = (id: string) =>
+      id.startsWith("gumtree") ? 0 : id.startsWith("shpock") ? 1 : 2
+    return rank(a.id) - rank(b.id)
+  })
+
+  const now = new Date().toISOString()
+  await ref.set(
+    {
+      venues: [...nextLive, ...rest],
+      updatedAt: now,
+    },
+    { merge: true }
+  )
+}

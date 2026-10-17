@@ -6,6 +6,11 @@ import {
   getSellComparePageBySlug,
   listSellComparePages,
 } from "@/lib/server/repositories/sell-compare.repository"
+import {
+  LIVE_LISTING_PLATFORMS,
+  recordLiveListing,
+  updateProductListingStatus,
+} from "@/lib/server/resale/record-live-listing"
 import type { HaveProduct, Product } from "@/lib/types/product"
 import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
 import { htmlToPlainText } from "@/lib/utils/html-plain-text"
@@ -156,6 +161,44 @@ export function buildInventoryChatTools(uid: string) {
         }
         return productSummary(product)
       },
+    }),
+
+    record_live_listing: tool({
+      description:
+        "Record that the user posted a live marketplace ad (Gumtree, Shpock, …): mark the have product as selling, save the URL/price in notes, and add a “Your live listing” row on the matching sell-compare page.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .describe("Product name, brand, model, sku, or Firestore id"),
+        platform: z.enum(LIVE_LISTING_PLATFORMS),
+        url: z.string().url().describe("Live ad URL"),
+        priceGbp: z.number().nonnegative().describe("Asking price in GBP"),
+        sellCompareSlug: z
+          .string()
+          .optional()
+          .describe(
+            "Optional sell-compare slug (e.g. sonos-move). Inferred from product name when omitted."
+          ),
+        location: z.string().optional().describe("e.g. Isle of Dogs"),
+        notes: z.string().optional(),
+        setWebsite: z
+          .boolean()
+          .optional()
+          .describe("Set product.website to the ad URL (default true)"),
+      }),
+      execute: async (args) => recordLiveListing(uid, args),
+    }),
+
+    update_listing_status: tool({
+      description:
+        "Set a have product listingStatus to not_listed, selling, or sold (optional soldWhere / soldAt).",
+      inputSchema: z.object({
+        query: z.string().describe("Product name or id"),
+        listingStatus: z.enum(["not_listed", "selling", "sold"]),
+        soldWhere: z.string().optional(),
+        soldAt: z.string().optional().describe("ISO date YYYY-MM-DD"),
+      }),
+      execute: async (args) => updateProductListingStatus(uid, args),
     }),
   }
 }
