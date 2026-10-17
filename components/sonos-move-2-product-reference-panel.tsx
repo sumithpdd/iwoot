@@ -1,15 +1,15 @@
 "use client"
 
-import {
-  SONOS_MOVE_2_REFERENCE,
-} from "@/lib/data/sonos-move-2-product-reference"
-import {
-  SONOS_MOVE_2_VENUE_ROWS,
-} from "@/lib/data/sonos-move-2-venue-prices"
+import { SONOS_MOVE_2_REFERENCE } from "@/lib/data/sonos-move-2-product-reference"
+import type { VenuePriceRow } from "@/lib/types/sell-compare"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-export function SonosMove2ProductReferencePanel() {
-  const gumtree = SONOS_MOVE_2_VENUE_ROWS.filter((r) => r.venue === "Gumtree")
+export function SonosMove2ProductReferencePanel({
+  venues,
+}: {
+  venues: VenuePriceRow[]
+}) {
+  const gumtree = venues.filter((r) => r.venue === "Gumtree")
   const prices = gumtree
     .map((r) => (r.priceGbp != null ? `£${r.priceGbp}` : null))
     .filter(Boolean)
@@ -38,7 +38,8 @@ export function SonosMove2ProductReferencePanel() {
           <p className="mt-1 text-muted-foreground">{SONOS_MOVE_2_REFERENCE.peerListingNote}</p>
           {prices && (
             <p className="mt-2 text-muted-foreground">
-              Current Gumtree examples in the grid: <strong className="text-foreground">{prices}</strong>
+              Current Gumtree examples in the grid:{" "}
+              <strong className="text-foreground">{prices}</strong>
             </p>
           )}
         </div>

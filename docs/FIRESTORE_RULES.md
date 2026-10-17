@@ -86,6 +86,12 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId);
     }
     
+    // Shared sell-compare venue grids (Admin writes; public read optional)
+    match /sellComparePages/{slug} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Users Collection (for future use)
     match /users/{userId} {
       // Allow read if user is viewing their own data

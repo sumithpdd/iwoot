@@ -234,9 +234,9 @@ if (!user) return <Login />
 - Edit mode: **Tabs** for **Details** vs **Price history** (`PriceHistoryComponent`)
 - Keyboard: **Ctrl+Enter** / **⌘+Enter** submits from the form
 
-### `/app/sell-compare/page.tsx` and `/app/sell-compare/.../page.tsx`
+### `/app/sell-compare/page.tsx` and `/app/sell-compare/[slug]/page.tsx`
 
-**Purpose**: Static **resale price compare** routes (no server scrape). Hub lists comparison pages; each page uses `SellingVenuePriceGrid` fed from **`lib/data/*-venue-prices.ts`** (shared types in `venue-price-types.ts`). Examples: AirPods Pro 2, Sonos Move 2. Update rows and `lastCheckedIso` manually when refreshing reference prices.
+**Purpose**: Firestore-backed **resale price compare** routes (no server scrape). Hub + `[slug]` load `sellComparePages` via Admin repository. Types in `lib/types/sell-compare.ts`. Update venue rows in Firebase (or `.local-admin` seed), not in `lib/data/`.
 
 ### `/components/selling-journey-card.tsx`
 

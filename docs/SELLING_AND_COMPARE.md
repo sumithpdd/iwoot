@@ -6,7 +6,7 @@ This guide describes the **user journey** for second-hand selling workflows in I
 
 After sign-in, the **dashboard** (`/dashboard`) is the home surface:
 
-1. **Sell compare hub** — Top navigation includes **Sell compare** → `/sell-compare` (static reference pages, not live scraping).
+1. **Sell compare hub** — Top navigation includes **Sell compare** → `/sell-compare` (Firestore-backed venue grids, not live scraping).
 2. **Selling journey card** — A guided card above the main tabs outlines:
    - Save **Stores** (retailers or places you buy from).
    - Add an **“I have”** product with **photos** and optional **store** link.
@@ -48,24 +48,20 @@ Collection: `brands` — same ownership pattern as stores (`userId`). Publish ma
 
 ## Price compare (`/sell-compare`)
 
-- **`/sell-compare`** — Hub page listing available comparison pages.
-- **`/sell-compare/sonos-move`** — **Your tracker item** (original Move S17): Gumtree / CeX / Shpock.
-- **`/sell-compare/nebula-cosmos-max`** — Nebula Cosmos Max D2150: Gumtree / CeX / Shpock.
-- **`/sell-compare/airpods-pro-2`** — Back Market, CeX, Gumtree, Shpock.
-- **`/sell-compare/sonos-move-2`** — Move 2 reference only (not your S17).
+Venue prices live in Firestore collection **`sellComparePages`** (doc id = slug). Types: **`lib/types/sell-compare.ts`**. Repo: **`lib/server/repositories/sell-compare.repository.ts`**. Routes: hub `/sell-compare` + dynamic `/sell-compare/[slug]`.
 
-Shared row type: **`lib/data/venue-price-types.ts`**. Registry: **`lib/data/sell-compare-catalog.ts`**.
+| Slug | Notes |
+|------|--------|
+| `sonos-move` | Original Move S17 — Gumtree / CeX / Shpock |
+| `nebula-cosmos-max` | Nebula Cosmos Max D2150 |
+| `airpods-pro-2` | Back Market, CeX, Gumtree, Shpock |
+| `sonos-move-2` | Move 2 reference only (not S17) |
 
-| Page | Data file | Export |
-|------|-----------|--------|
-| Sonos Move (S17) | `lib/data/sonos-move-venue-prices.ts` | `SONOS_MOVE_VENUE_ROWS` |
-| Nebula Cosmos Max | `lib/data/nebula-cosmos-max-venue-prices.ts` | `NEBULA_COSMOS_MAX_VENUE_ROWS` |
-| AirPods Pro 2 | `lib/data/airpods-pro-2-venue-prices.ts` | `AIRPODS_PRO_2_VENUE_ROWS` |
-| Sonos Move 2 | `lib/data/sonos-move-2-venue-prices.ts` | `SONOS_MOVE_2_VENUE_ROWS` |
+Each doc: `title`, `blurb`, `intro`, `path`, `venues[]` (`VenuePriceRow`), `sortOrder`, `published`, optional `referencePanel`.
+
+Update prices in Firebase Console (or a `.local-admin` Admin script). Do **not** put venue prices back in `lib/data/`.
 
 External agents: see **`docs/MCP.md`**. In-app Gemini: floating chat panel with inventory tools.
-
-Update prices, URLs, and `lastCheckedIso` manually when you verify each site; most marketplaces render prices in the browser, so automated scraping is intentionally not part of the app.
 
 UI building blocks:
 

@@ -7,17 +7,21 @@ description: IWOOT inventory tracking, sell-compare (Gumtree/CeX/Shpock), Gemini
 
 ## App purpose
 
-Personal tracker for products you **want** or **have**: purchase prices, receipts, listing status, and static UK **sell-compare** grids for Gumtree, CeX (webuy), and Shpock.
+Personal tracker for products you **want** or **have**: purchase prices, receipts, listing status, and UK **sell-compare** grids for Gumtree, CeX (webuy), and Shpock.
 
-## Sell-compare (static)
+## Sell-compare (Firestore)
 
 | Item | Path | Data |
 |------|------|------|
-| Sonos Move (S17) | `/sell-compare/sonos-move` | `lib/data/sonos-move-venue-prices.ts` |
-| Nebula Cosmos Max | `/sell-compare/nebula-cosmos-max` | `lib/data/nebula-cosmos-max-venue-prices.ts` |
-| Registry | — | `lib/data/sell-compare-catalog.ts` |
+| Hub | `/sell-compare` | `listSellComparePages()` |
+| Page | `/sell-compare/[slug]` | `getSellComparePageBySlug(slug)` |
+| Collection | — | `sellComparePages/{slug}` with embedded `venues[]` |
+| Types | — | `lib/types/sell-compare.ts` |
+| Repo | — | `lib/server/repositories/sell-compare.repository.ts` |
 
-Do not confuse **Move** (S17) with **Move 2**. Inventory is Firestore; sell-compare is not.
+Do not confuse **Move** (S17) with **Move 2**. Inventory is user-scoped products; sell-compare is shared reference docs. Never put venue prices in `lib/data/`.
+
+Seed / update prices with a throwaway script under `.local-admin/` (skill `iwoot-local-admin`).
 
 ## Gemini in-app chat
 

@@ -41,7 +41,7 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
 ✅ **Resale / marketplace helpers**
 - **Selling journey** card on the dashboard (stores → “I have” + photos → compare → receipts)
 - **“Currently selling”** and **where listed** fields for owned items
-- **Static price compare** pages (`/sell-compare`) with example venue grids (maintained in `lib/data/`)
+- **Price compare** pages (`/sell-compare`) with venue grids in Firestore `sellComparePages`
 
 ✅ **Product Lookup**
 - Search products by name or barcode/UPC
@@ -90,7 +90,7 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
    - Selling journey card and nav link to **Sell compare**
 
 3. **Sell compare hub** (`/sell-compare`)
-   - Static reference pages for resale price comparison (e.g. `/sell-compare/airpods-pro-2`, `/sell-compare/sonos-move-2`)
+   - Firestore-backed resale price comparison (e.g. `/sell-compare/sonos-move`, `/sell-compare/nebula-cosmos-max`)
 
 4. **Admin Dashboard** (`/admin`)
    - User management

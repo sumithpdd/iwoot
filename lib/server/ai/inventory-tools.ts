@@ -3,9 +3,9 @@ import { z } from "zod"
 import { listProductsByUser } from "@/lib/server/repositories/products.repository"
 import { getProductById } from "@/lib/server/repositories/products.repository"
 import {
-  getSellCompareBySlug,
-  SELL_COMPARE_CATALOG,
-} from "@/lib/data/sell-compare-catalog"
+  getSellComparePageBySlug,
+  listSellComparePages,
+} from "@/lib/server/repositories/sell-compare.repository"
 import type { HaveProduct, Product } from "@/lib/types/product"
 import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
 import { htmlToPlainText } from "@/lib/utils/html-plain-text"
@@ -70,40 +70,38 @@ export function buildInventoryChatTools(uid: string) {
 
     get_sell_compare: tool({
       description:
-        "Load static UK sell-compare venue rows (Gumtree, CeX, Shpock, etc.) for a known product slug.",
+        "Load UK sell-compare venue rows from Firestore (Gumtree, CeX, Shpock, etc.) for a page slug.",
       inputSchema: z.object({
         slug: z
-          .enum([
-            "sonos-move",
-            "nebula-cosmos-max",
-            "airpods-pro-2",
-            "sonos-move-2",
-          ])
-          .describe("Sell-compare page slug"),
+          .string()
+          .describe("Sell-compare page slug, e.g. sonos-move"),
       }),
       execute: async ({ slug }) => {
-        const entry = getSellCompareBySlug(slug)
+        const entry = await getSellComparePageBySlug(slug)
         if (!entry) return { error: "Unknown slug" }
         return {
           title: entry.title,
           path: entry.path,
           blurb: entry.blurb,
-          venues: entry.rows,
+          venues: entry.venues,
         }
       },
     }),
 
     list_sell_compare_pages: tool({
-      description: "List all static sell-compare pages available in the app.",
+      description: "List published sell-compare pages from Firestore.",
       inputSchema: z.object({}),
-      execute: async () => ({
-        pages: SELL_COMPARE_CATALOG.map((e) => ({
-          slug: e.slug,
-          path: e.path,
-          title: e.title,
-          blurb: e.blurb,
-        })),
-      }),
+      execute: async () => {
+        const pages = await listSellComparePages({ publishedOnly: true })
+        return {
+          pages: pages.map((e) => ({
+            slug: e.slug,
+            path: e.path,
+            title: e.title,
+            blurb: e.blurb,
+          })),
+        }
+      },
     }),
 
     draft_listing: tool({

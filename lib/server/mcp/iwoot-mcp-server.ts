@@ -3,9 +3,9 @@ import { z } from "zod"
 import { listProductsByUser } from "@/lib/server/repositories/products.repository"
 import { getProductById } from "@/lib/server/repositories/products.repository"
 import {
-  getSellCompareBySlug,
-  SELL_COMPARE_CATALOG,
-} from "@/lib/data/sell-compare-catalog"
+  getSellComparePageBySlug,
+  listSellComparePages,
+} from "@/lib/server/repositories/sell-compare.repository"
 import type { HaveProduct, Product } from "@/lib/types/product"
 import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
 import { htmlToPlainText } from "@/lib/utils/html-plain-text"
@@ -93,16 +93,18 @@ export function createIwootMcpServer(uid: string): McpServer {
     "list_sell_compare_pages",
     {
       description:
-        "List static sell-compare pages (Gumtree / CeX / Shpock reference grids).",
+        "List Firestore sell-compare pages (Gumtree / CeX / Shpock reference grids).",
     },
-    async () =>
-      textResult(
-        SELL_COMPARE_CATALOG.map((e) => ({
+    async () => {
+      const pages = await listSellComparePages({ publishedOnly: true })
+      return textResult(
+        pages.map((e) => ({
           slug: e.slug,
           path: e.path,
           title: e.title,
         }))
       )
+    }
   )
 
   server.registerTool(
@@ -111,21 +113,16 @@ export function createIwootMcpServer(uid: string): McpServer {
       description:
         "Venue price rows for a sell-compare slug (e.g. sonos-move, nebula-cosmos-max).",
       inputSchema: {
-        slug: z.enum([
-          "sonos-move",
-          "nebula-cosmos-max",
-          "airpods-pro-2",
-          "sonos-move-2",
-        ]),
+        slug: z.string(),
       },
     },
     async ({ slug }) => {
-      const entry = getSellCompareBySlug(slug)
+      const entry = await getSellComparePageBySlug(slug)
       if (!entry) return textResult({ error: "Unknown slug" }, true)
       return textResult({
         title: entry.title,
         path: entry.path,
-        venues: entry.rows,
+        venues: entry.venues,
       })
     }
   )

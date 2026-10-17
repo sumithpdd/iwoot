@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import type { VenuePriceRow } from "@/lib/data/venue-price-types"
+import type { VenuePriceRow } from "@/lib/types/sell-compare"
 import {
   Table,
   TableBody,

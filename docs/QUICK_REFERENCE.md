@@ -48,18 +48,14 @@ await ProductService.deleteProduct(getToken, productId)
 
 Product validation for long HTML and spec maps: `lib/validators/product.validator.ts` (`validateDescriptionAndSpecs`).
 
-## Sell compare (static pages)
+## Sell compare (Firestore)
 
 - **Hub**: `/sell-compare`
-- **Product pages**:
-  - `/sell-compare/airpods-pro-2`
-  - `/sell-compare/sonos-move-2`
-- **Shared types**: `lib/data/venue-price-types.ts`
-- **Data**:
-  - `lib/data/airpods-pro-2-venue-prices.ts` → `AIRPODS_PRO_2_VENUE_ROWS`
-  - `lib/data/sonos-move-2-venue-prices.ts` → `SONOS_MOVE_2_VENUE_ROWS` (Gumtree £275 / £300 examples + Shpock search)
+- **Pages**: `/sell-compare/[slug]` (e.g. `sonos-move`, `nebula-cosmos-max`)
+- **Collection**: `sellComparePages/{slug}` with embedded `venues[]`
+- **Types / repo**: `lib/types/sell-compare.ts`, `lib/server/repositories/sell-compare.repository.ts`
 
-Edit venue URLs, GBP amounts, notes, and `lastCheckedIso` when you re-verify each site.
+Edit venue URLs, GBP amounts, notes, and `lastCheckedIso` in Firebase (or `.local-admin` Admin script).
 
 ## Product Lookup
 

@@ -27,5 +27,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
+
+    // Shared UK sell-compare grids (Admin SDK only; client never writes)
+    match /sellComparePages/{slug} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

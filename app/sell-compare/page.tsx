@@ -2,14 +2,18 @@ import Link from "next/link"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Scale } from "lucide-react"
-import { SELL_COMPARE_CATALOG } from "@/lib/data/sell-compare-catalog"
+import { listSellComparePages } from "@/lib/server/repositories/sell-compare.repository"
 
 export const metadata = {
   title: "Resale price compare | IWOOT",
   description: "Reference price grids for Gumtree, CeX, Shpock, and more.",
 }
 
-export default function SellCompareHubPage() {
+export const dynamic = "force-dynamic"
+
+export default async function SellCompareHubPage() {
+  const pages = await listSellComparePages({ publishedOnly: true })
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-gray-950 dark:to-gray-900">
       <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 lg:px-8">
@@ -21,8 +25,8 @@ export default function SellCompareHubPage() {
               Price compare hub
             </h1>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              Static reference for Gumtree, CeX, and Shpock — edit repo data when you re-check. Not
-              live scraping. Your saved tracker is on the dashboard.
+              Venue prices live in Firestore (<code className="text-xs">sellComparePages</code>
+              ). Not live scraping. Your saved tracker is on the dashboard.
             </p>
           </div>
           <Button variant="outline" asChild>
@@ -30,22 +34,29 @@ export default function SellCompareHubPage() {
           </Button>
         </div>
 
-        <div className="space-y-4">
-          {SELL_COMPARE_CATALOG.map((entry) => (
-            <Card key={entry.slug}>
-              <CardHeader>
-                <CardTitle className="text-base">{entry.title}</CardTitle>
-                <CardDescription>{entry.blurb}</CardDescription>
-                <Button className="mt-4 w-fit" asChild>
-                  <Link href={entry.path}>
-                    Open comparison
-                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
-                  </Link>
-                </Button>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
+        {pages.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No sell-compare pages published yet. Seed the{" "}
+            <code className="text-xs">sellComparePages</code> collection via Admin.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {pages.map((entry) => (
+              <Card key={entry.slug}>
+                <CardHeader>
+                  <CardTitle className="text-base">{entry.title}</CardTitle>
+                  <CardDescription>{entry.blurb}</CardDescription>
+                  <Button className="mt-4 w-fit" asChild>
+                    <Link href={entry.path}>
+                      Open comparison
+                      <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+                    </Link>
+                  </Button>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

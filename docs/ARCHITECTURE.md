@@ -26,11 +26,11 @@ lib/server/storage-admin
 | API | `app/api/**/route.ts` | `runtime = "nodejs"`. Verify ID token. |
 | Repositories | `lib/server/repositories/` | Admin Firestore. Never import from client components. |
 
-## Data: inventory vs static reference
+## Data: inventory vs sell-compare reference
 
 **Source of truth for what the user owns** is Firestore (`products`, `receipts`, `stores`, `brands`), scoped by `userId`.
 
-`lib/data/` is **static sell-compare copy** (venue price grids, listing presets, suggested store names). It is **not** the user’s tracker. Do not duplicate live products there. `/sell-compare` pages must not seed Firestore.
+**Sell-compare venue prices** live in Firestore `sellComparePages` (shared reference, not per-user). Types in `lib/types/sell-compare.ts`. Do not store venue GBP/URLs in `lib/data/`. Optional product-spec panels may use `lib/data/*-product-reference.ts`. Suggested store names may remain in `lib/data/`.
 
 Intentional Firestore denormalization (not duplication to remove):
 
@@ -51,11 +51,11 @@ Lists stay readable without joins. Keep the string in sync when the user picks a
 
 - In-app Gemini (`POST /api/chat`): inventory context + tools (`list_inventory`, `get_sell_compare`, `draft_listing`).
 - MCP (`POST /api/mcp`): same tools for Claude / ChatGPT / Cursor. Auth: Firebase ID token or `IWOOT_MCP_TOKEN` + `IWOOT_MCP_USER_ID`. See `docs/MCP.md`.
-- Sell-compare is static UK reference (Gumtree / CeX / Shpock). Primary pages: `/sell-compare/sonos-move`, `/sell-compare/nebula-cosmos-max`.
+- Sell-compare is Firestore UK reference (Gumtree / CeX / Shpock). Primary pages: `/sell-compare/sonos-move`, `/sell-compare/nebula-cosmos-max`.
 
 ## React / Next.js conventions
 
-- Default Server Components for static pages (`/sell-compare`). Interactive dashboard/dialogs are client components.
+- Sell-compare hub/`[slug]` are dynamic Server Components (Admin SDK). Interactive dashboard/dialogs are client components.
 - One concern per module: dialogs submit through services; API routes do not render UI.
 - Do not add unused hooks. Dashboard loads products/receipts/stores/brands together in the page — that is the container. Extract a hook only when two screens share the same state machine.
 - Images: Firebase Storage at `users/{uid}/products/{productId}/images|receipts/…`. Never commit `public/receipts` or `public/catalog`.
