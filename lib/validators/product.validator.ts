@@ -7,11 +7,10 @@
 
 import { Product, WantProduct, HaveProduct } from "@/lib/types/product"
 import { normalizeProductImages } from "@/lib/utils/product-images"
+import { isAbsoluteUrl, isCatalogOrHttpAsset } from "@/lib/utils/http-url"
+import type { ValidationResult } from "@/lib/validators/result"
 
-export interface ValidationResult {
-  valid: boolean
-  errors: string[]
-}
+export type { ValidationResult }
 
 /**
  * Validate a product before creation
@@ -76,7 +75,7 @@ export function validateProduct(
     (product as { images?: unknown }).images
   )
   imageEntries.forEach((entry, index) => {
-    if (!isValidUrl(entry.url)) {
+    if (!isValidImageSrc(entry.url)) {
       errors.push(`Image URL ${index + 1} is not a valid URL`)
     }
     entry.tags?.forEach((tag, ti) => {
@@ -144,7 +143,7 @@ export function validateProductUpdate(
   if (updates.images !== undefined) {
     const imageEntries = normalizeProductImages(updates.images as unknown)
     imageEntries.forEach((entry, index) => {
-      if (!isValidUrl(entry.url)) {
+      if (!isValidImageSrc(entry.url)) {
         errors.push(`Image URL ${index + 1} is not a valid URL`)
       }
       entry.tags?.forEach((tag, ti) => {
@@ -282,12 +281,11 @@ function validateDescriptionAndSpecs(
  * Helper: Check if string is a valid URL
  */
 function isValidUrl(url: string): boolean {
-  try {
-    new URL(url)
-    return true
-  } catch {
-    return false
-  }
+  return isAbsoluteUrl(url)
+}
+
+function isValidImageSrc(src: string): boolean {
+  return isCatalogOrHttpAsset(src)
 }
 
 /**

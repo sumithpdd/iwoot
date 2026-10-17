@@ -19,6 +19,8 @@ export interface ImageUploadProps {
   maxImages?: number
   folder: "products" | "receipts"
   userId: string
+  productId?: string
+  receiptId?: string
   disabled?: boolean
   /** Per-image tags (e.g. product photos only) */
   allowTags?: boolean
@@ -32,6 +34,8 @@ export default function ImageUpload({
   maxImages = 12,
   folder,
   userId: _userId,
+  productId,
+  receiptId,
   disabled = false,
   allowTags = true,
   allowReorder = true,
@@ -60,7 +64,10 @@ export default function ImageUpload({
     setUploading(true)
 
     try {
-      const newUrls = await uploadImagesViaApi(getToken, fileArray, folder)
+      const newUrls = await uploadImagesViaApi(getToken, fileArray, folder, {
+        productId,
+        receiptId,
+      })
       const additions: ProductImageEntry[] = newUrls.map((url) => ({ url, tags: [] }))
       onImagesChange([...images, ...additions])
     } catch (error: unknown) {

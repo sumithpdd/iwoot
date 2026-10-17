@@ -29,26 +29,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user)
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
+      setUser(nextUser)
       setLoading(false)
 
-      if (user) {
-        // Set auth token in cookie for server-side access
+      if (nextUser) {
         try {
-          const token = await user.getIdToken()
+          const token = await nextUser.getIdToken()
           document.cookie = `auth-token=${token}; path=/; max-age=3600; SameSite=Lax`
         } catch (error) {
           console.error("Error getting auth token:", error)
         }
       } else {
         document.cookie = "auth-token=; path=/; max-age=0"
-        router.push("/login")
       }
     })
 
-    return () => unsubscribe()
-  }, [router])
+    const timeout = window.setTimeout(() => {
+      setLoading((still) => {
+        if (still) {
+          console.warn("[auth] Firebase Auth did not respond in time")
+        }
+        return false
+      })
+    }, 8000)
+
+    return () => {
+      unsubscribe()
+      window.clearTimeout(timeout)
+    }
+  }, [])
 
   const signOut = async () => {
     if (auth) {

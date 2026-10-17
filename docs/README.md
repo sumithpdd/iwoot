@@ -30,12 +30,9 @@ Complete guide to all documentation files in the IWOOT project.
    - TypeScript (types, interfaces)
    - Design patterns
 
-2. **`docs/ARCHITECTURE.md`** - Architecture deep dive
-   - Project structure
-   - Design patterns (Service Layer, Repository, Hooks)
-   - Code organization
-   - Data flow diagrams
-   - Best practices
+2. **`docs/ARCHITECTURE.md`** - Current layers (UI → services → API → Admin SDK)
+   - Inventory in Firestore vs static `lib/data`
+   - What not to commit (seed APIs, Admin scripts)
 
 3. **`docs/DEVELOPER_GUIDE.md`** - Comprehensive developer guide
    - File-by-file breakdown
@@ -60,7 +57,9 @@ Complete guide to all documentation files in the IWOOT project.
 2. **`docs/SELLING_AND_COMPARE.md`** - Resale journey & price compare
    - Dashboard selling journey card
    - Stores, “I have” products, images, listing fields
-   - `/sell-compare` hub and static venue data
+   - `/sell-compare` hub (Sonos Move, Nebula, AirPods, …)
+
+3. **`docs/MCP.md`** - Claude / ChatGPT MCP connector for inventory + listings
 
 3. **`docs/FIRESTORE_PRODUCT_EXAMPLE.md`** - Example `products` document (field shapes, legacy `images`)
 
@@ -74,7 +73,7 @@ Complete guide to all documentation files in the IWOOT project.
    - Security checklist
    - Best practices
 
-2. **`docs/FIRESTORE_RULES.md`** - Firestore security rules
+2. **`docs/FIRESTORE_RULES.md`** - Firestore security rules (console **or** `firebase deploy --only firestore:rules`)
    - Complete rules explanation
    - Step-by-step setup
    - Troubleshooting

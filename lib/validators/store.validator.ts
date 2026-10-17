@@ -1,9 +1,8 @@
 import { Store } from "@/lib/types/store"
+import { isAbsoluteUrl } from "@/lib/utils/http-url"
+import type { ValidationResult } from "@/lib/validators/result"
 
-export interface ValidationResult {
-  valid: boolean
-  errors: string[]
-}
+export type { ValidationResult }
 
 export function validateStore(
   store: Omit<Store, "id" | "createdAt" | "updatedAt">
@@ -14,7 +13,7 @@ export function validateStore(
     errors.push("Store name is required")
   }
 
-  if (store.website?.trim() && !isValidUrl(store.website.trim())) {
+  if (store.website?.trim() && !isAbsoluteUrl(store.website.trim())) {
     errors.push("Website must be a valid URL")
   }
 
@@ -38,7 +37,7 @@ export function validateStoreUpdate(
     errors.push("Store name cannot be empty")
   }
 
-  if (updates.website !== undefined && updates.website && !isValidUrl(updates.website.trim())) {
+  if (updates.website !== undefined && updates.website && !isAbsoluteUrl(updates.website.trim())) {
     errors.push("Website must be a valid URL")
   }
 
@@ -47,13 +46,4 @@ export function validateStoreUpdate(
   }
 
   return { valid: errors.length === 0, errors }
-}
-
-function isValidUrl(url: string): boolean {
-  try {
-    new URL(url)
-    return true
-  } catch {
-    return false
-  }
 }

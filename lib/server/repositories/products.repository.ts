@@ -52,6 +52,20 @@ export async function createProductDoc(
   return ref.id
 }
 
+export async function createProductDocWithId(
+  productId: string,
+  data: Omit<Product, "id" | "createdAt" | "updatedAt">
+): Promise<string> {
+  const db = getAdminFirestore()
+  const now = new Date().toISOString()
+  await db.collection(COLLECTION).doc(productId).create({
+    ...data,
+    createdAt: now,
+    updatedAt: now,
+  })
+  return productId
+}
+
 /** Scalar product fields where JSON `null` means remove from the document (listing migration). */
 const PRODUCT_NULL_DELETES = new Set([
   "isSelling",

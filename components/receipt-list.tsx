@@ -83,6 +83,16 @@ export default function ReceiptList({
               {receipt.notes && (
                 <p className="text-sm text-gray-600 mt-2">{receipt.notes}</p>
               )}
+              {receipt.receiptFile && (
+                <a
+                  href={receipt.receiptFile}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block text-sm text-blue-600 underline dark:text-blue-400"
+                >
+                  Invoice PDF
+                </a>
+              )}
             </div>
 
             <div className="flex gap-2">

@@ -13,7 +13,7 @@ After sign-in, the **dashboard** (`/dashboard`) is the home surface:
    - Open **price compare** for rough resale reference.
    - Optionally add **Receipts** (warranty, price proof); store profiles can be prefilled from a receipt.
 
-The main **tabs** are **Products**, **Receipts**, and **Stores**. Tab state is controlled so buttons on the journey card switch the visible tab reliably.
+The main **tabs** are **Products**, **Receipts**, **Stores**, and **Brands**. Tab state is controlled so buttons on the journey card switch the visible tab reliably.
 
 ## Products: fields that matter for resale
 
@@ -29,7 +29,8 @@ The main **tabs** are **Products**, **Receipts**, and **Stores**. Tab state is c
 
 - **Saved store profile** — Optional `storeId` linking to a document under **Stores**.
 - **Purchase location** — Free text if you do not use a saved store.
-- **Listing** — `listingStatus`: `not_listed` | `selling` | `sold`; `listingPlatforms[]` for multiple marketplaces; when **sold**, use `soldAt` and `soldWhere`. Legacy `isSelling` / `sellingOn` are still read until you re-save the product.
+- **Listing** — `listingStatus`: `not_listed` | `selling` | `sold`; `listingPlatforms[]` multi-select for marketplaces; when **sold**, use `soldAt` and `soldWhere`. Legacy `isSelling` / `sellingOn` are still read until you re-save the product.
+- **Brand profile** — Optional `brandId` linking to a **Brands** document (keeps the display `brand` string in sync when you pick a profile).
 
 The product dialog includes short helper copy for photos and selling, plus a link to the **price compare hub**.
 
@@ -37,14 +38,34 @@ The product dialog includes short helper copy for photos and selling, plus a lin
 
 **Stores** (`StoreDialog`, **Stores** tab) are user-scoped profiles (name, optional website, address, phone, notes). They exist so **“I have”** products and **receipts** stay organised. Creating a store from a receipt draft is supported from the product dialog when a receipt is linked.
 
-Firestore: `stores` collection; each document should include `userId` for security rules (see `docs/FIRESTORE_RULES.md`).
+Bag: `stores` collection; each document should include `userId` for security rules (see `docs/FIRESTORE_RULES.md`).
+
+## Brands
+
+**Brands** (`BrandDialog`, **Brands** tab) are user-scoped manufacturer / label profiles (name, optional website, notes). Link them from any product via **Saved brand profile**.
+
+Collection: `brands` — same ownership pattern as stores (`userId`). Publish matching rules from `docs/FIRESTORE_RULES.md` (console or CLI).
 
 ## Price compare (`/sell-compare`)
 
 - **`/sell-compare`** — Hub page listing available comparison pages.
-- **`/sell-compare/airpods-pro-2`** — Example grid: Back Market, CeX, Gumtree, Shpock with links.
+- **`/sell-compare/sonos-move`** — **Your tracker item** (original Move S17): Gumtree / CeX / Shpock.
+- **`/sell-compare/nebula-cosmos-max`** — Nebula Cosmos Max D2150: Gumtree / CeX / Shpock.
+- **`/sell-compare/airpods-pro-2`** — Back Market, CeX, Gumtree, Shpock.
+- **`/sell-compare/sonos-move-2`** — Move 2 reference only (not your S17).
 
-Data lives in **`lib/data/airpods-pro-2-venue-prices.ts`** (`AIRPODS_PRO_2_VENUE_ROWS`). Update prices and `lastCheckedIso` manually when you verify each site; most marketplaces render prices in the browser, so automated scraping is intentionally not part of the app.
+Shared row type: **`lib/data/venue-price-types.ts`**. Registry: **`lib/data/sell-compare-catalog.ts`**.
+
+| Page | Data file | Export |
+|------|-----------|--------|
+| Sonos Move (S17) | `lib/data/sonos-move-venue-prices.ts` | `SONOS_MOVE_VENUE_ROWS` |
+| Nebula Cosmos Max | `lib/data/nebula-cosmos-max-venue-prices.ts` | `NEBULA_COSMOS_MAX_VENUE_ROWS` |
+| AirPods Pro 2 | `lib/data/airpods-pro-2-venue-prices.ts` | `AIRPODS_PRO_2_VENUE_ROWS` |
+| Sonos Move 2 | `lib/data/sonos-move-2-venue-prices.ts` | `SONOS_MOVE_2_VENUE_ROWS` |
+
+External agents: see **`docs/MCP.md`**. In-app Gemini: floating chat panel with inventory tools.
+
+Update prices, URLs, and `lastCheckedIso` manually when you verify each site; most marketplaces render prices in the browser, so automated scraping is intentionally not part of the app.
 
 UI building blocks:
 

@@ -38,7 +38,8 @@ export class ReceiptService {
 
   static async createReceipt(
     getToken: () => Promise<string | null>,
-    receiptData: Omit<Receipt, "id" | "createdAt" | "updatedAt">
+    receiptData: Omit<Receipt, "id" | "createdAt" | "updatedAt">,
+    clientId?: string
   ): Promise<string> {
     const validation = validateReceipt(receiptData)
     if (!validation.valid) {
@@ -48,7 +49,7 @@ export class ReceiptService {
     try {
       const res = await apiRequest<{ id: string }>(getToken, "/api/receipts", {
         method: "POST",
-        body: JSON.stringify(receiptData),
+        body: JSON.stringify({ ...receiptData, clientId }),
       })
       return res.id
     } catch (error: unknown) {

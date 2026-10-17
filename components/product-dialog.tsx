@@ -46,6 +46,7 @@ import { RichTextEditor } from "@/components/rich-text-editor"
 import { ProductSpecificationsEditor } from "@/components/product-specifications-editor"
 import { htmlToPlainText } from "@/lib/utils/html-plain-text"
 import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
+import { newClientEntityId } from "@/lib/utils/client-entity-id"
 
 const wantProductSchema = z.object({
   name: z.string().min(1, "Product name is required"),
@@ -118,6 +119,12 @@ export default function ProductDialog({
     () => user?.getIdToken() ?? Promise.resolve(null),
     [user]
   )
+
+  const [entityId, setEntityId] = useState(() => product?.id || newClientEntityId())
+  useEffect(() => {
+    if (!open) return
+    setEntityId(product?.id || newClientEntityId())
+  }, [open, product?.id])
 
   const {
     register,
@@ -348,7 +355,7 @@ export default function ProductDialog({
           description: "Product updated.",
         })
       } else {
-        await ProductService.createProduct(getToken, productData)
+        await ProductService.createProduct(getToken, productData, entityId)
         toast({
           title: "Added",
           description: "Product saved to your list.",
@@ -951,6 +958,7 @@ export default function ProductDialog({
           maxImages={12}
           folder="products"
           userId={user?.uid || ""}
+          productId={entityId}
           disabled={!user}
           allowTags
           allowReorder
@@ -1024,7 +1032,7 @@ export default function ProductDialog({
     <>
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent
-        className="flex max-h-[95vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[900px] lg:max-w-[1000px]"
+        className="flex h-[min(95dvh,920px)] max-h-[95dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[900px] lg:max-w-[1000px]"
         onPointerDownOutside={(e) => {
           if (isSubmitting) e.preventDefault()
         }}
@@ -1060,12 +1068,15 @@ export default function ProductDialog({
           </DialogHeader>
         </div>
         {product ? (
-          <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col px-6">
+          <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col overflow-hidden px-6">
             <TabsList className="grid w-full shrink-0 grid-cols-2">
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="history">Price history</TabsTrigger>
             </TabsList>
-            <TabsContent value="details" className="mt-4 min-h-0 flex-1 space-y-6 overflow-y-auto pb-4">
+            <TabsContent
+              value="details"
+              className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 data-[state=inactive]:hidden"
+            >
               <form
                 onSubmit={handleSubmit(onSubmit)}
                 onKeyDown={submitShortcut}
@@ -1074,7 +1085,10 @@ export default function ProductDialog({
                 {renderFormContent()}
               </form>
             </TabsContent>
-            <TabsContent value="history" className="mt-4 space-y-6 overflow-y-auto pb-6">
+            <TabsContent
+              value="history"
+              className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6 data-[state=inactive]:hidden"
+            >
               {product.id && (
                 <PriceHistoryComponent
                   productId={product.id}

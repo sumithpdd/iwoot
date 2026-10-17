@@ -11,6 +11,7 @@ import { Product, ProductType } from "@/lib/types/product"
 import { coerceProductImagesForPersist } from "@/lib/utils/product-images"
 import { verifyStoreIdForUser } from "@/lib/server/verify-user-store"
 import { verifyBrandIdForUser } from "@/lib/server/verify-user-brand"
+import { isClientEntityId } from "@/lib/utils/client-entity-id"
 
 export async function GET(request: Request) {
   const uid = await getUidFromRequest(request)
@@ -46,6 +47,10 @@ export async function POST(request: Request) {
   } catch {
     return badRequest("Invalid JSON body")
   }
+
+  const clientId =
+    typeof body.clientId === "string" ? body.clientId.trim() : ""
+  delete body.clientId
 
   for (const key of SERVER_ONLY_PRODUCT_KEYS) {
     delete body[key]
@@ -101,6 +106,18 @@ export async function POST(request: Request) {
   const validation = validateProduct(productData as Omit<Product, "id" | "createdAt" | "updatedAt">)
   if (!validation.valid) {
     return badRequest(validation.errors.join(", "))
+  }
+
+  if (clientId) {
+    if (!isClientEntityId(clientId)) {
+      return badRequest("Invalid clientId")
+    }
+    const existing = await repo.getProductById(clientId)
+    if (existing) {
+      return badRequest("Product id already exists")
+    }
+    const id = await repo.createProductDocWithId(clientId, productData)
+    return NextResponse.json({ id })
   }
 
   const id = await repo.createProductDoc(productData)

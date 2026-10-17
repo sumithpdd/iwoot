@@ -378,15 +378,15 @@ Abstracts data access.
 
 **Example**:
 ```typescript
-// Repository (data access)
-export async function getProducts(userId) {
-  return await getDocs(query(...))
+// Repository (server, Admin SDK)
+export async function listProductsByUser(userId: string) {
+  return getAdminFirestore().collection("products").where("userId", "==", userId).get()
 }
 
-// Service (business logic)
+// Service (browser)
 export class ProductService {
-  static async getProducts(userId) {
-    return await productRepository.getProducts(userId)
+  static async getProducts(getToken: () => Promise<string | null>) {
+    return apiRequest(getToken, "/api/products")
   }
 }
 ```
@@ -402,21 +402,8 @@ Encapsulates reusable logic.
 
 **Example**:
 ```typescript
-// Hook
-function useProducts() {
-  const [products, setProducts] = useState([])
-  const loadProducts = async () => {
-    const data = await ProductService.getProducts()
-    setProducts(data)
-  }
-  return { products, loadProducts }
-}
-
-// Component
-function ProductList() {
-  const { products, loadProducts } = useProducts()
-  // Clean and simple!
-}
+// Dashboard (container) loads via ProductService — do not add a second unused hook.
+const data = await ProductService.getProducts(getToken)
 ```
 
 ## Common Patterns in This Project

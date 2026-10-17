@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { getUidFromRequest, unauthorized, badRequest } from "@/lib/server/require-auth"
-import { deleteImageByUrl } from "@/lib/server/storage-admin"
+import {
+  deleteImageByUrl,
+  storagePathFromDownloadUrl,
+  storagePathOwnedByUser,
+} from "@/lib/server/storage-admin"
 
 export async function DELETE(request: Request) {
   const uid = await getUidFromRequest(request)
@@ -18,11 +22,11 @@ export async function DELETE(request: Request) {
     return badRequest("url is required")
   }
 
-  if (!url.includes(`${uid}/`) && !url.includes(`%2F${uid}%2F`)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-  }
-
   try {
+    const path = storagePathFromDownloadUrl(url)
+    if (!storagePathOwnedByUser(path, uid)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
     await deleteImageByUrl(url)
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

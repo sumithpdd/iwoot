@@ -113,37 +113,9 @@ Click **Publish**.
 
 ## Step 8: Storage Security Rules
 
-Go to **Storage** → **Rules** tab:
+Deploy **`storage.rules`** (`npx firebase deploy --only storage`) or paste that file into **Storage** → **Rules**.
 
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    match /products/{userId}/{fileName} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) 
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(userId);
-    }
-    match /receipts/{userId}/{fileName} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) 
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(userId);
-    }
-  }
-}
-```
-
-Click **Publish**.
+Media path: `users/{userId}/products/{productId}/images|receipts/`. Do not commit invoices or product photos.
 
 ## Troubleshooting
 

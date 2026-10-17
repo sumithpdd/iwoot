@@ -8,6 +8,7 @@ import * as repo from "@/lib/server/repositories/receipts.repository"
 import * as storesRepo from "@/lib/server/repositories/stores.repository"
 import { validateReceipt } from "@/lib/validators/receipt.validator"
 import { Receipt } from "@/lib/types/receipt"
+import { isClientEntityId } from "@/lib/utils/client-entity-id"
 
 export async function GET(request: Request) {
   const uid = await getUidFromRequest(request)
@@ -27,6 +28,10 @@ export async function POST(request: Request) {
   } catch {
     return badRequest("Invalid JSON body")
   }
+
+  const clientId =
+    typeof body.clientId === "string" ? body.clientId.trim() : ""
+  delete body.clientId
 
   const receiptData = {
     ...body,
@@ -53,6 +58,18 @@ export async function POST(request: Request) {
   const validation = validateReceipt(receiptData)
   if (!validation.valid) {
     return badRequest(validation.errors.join(", "))
+  }
+
+  if (clientId) {
+    if (!isClientEntityId(clientId)) {
+      return badRequest("Invalid clientId")
+    }
+    const existing = await repo.getReceiptById(clientId)
+    if (existing) {
+      return badRequest("Receipt id already exists")
+    }
+    const id = await repo.createReceiptDocWithId(clientId, receiptData)
+    return NextResponse.json({ id })
   }
 
   const id = await repo.createReceiptDoc(receiptData)

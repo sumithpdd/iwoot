@@ -64,9 +64,9 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
 - React Hook Form with Zod validation
 
 ✅ **Firebase Integration**
-- Firebase Authentication
-- Firestore Database
-- Real-time data updates
+- Firebase Authentication (browser)
+- Cloud Firestore via Next.js API routes + Admin SDK
+- Firebase Storage for images (or `/catalog` / `/receipts` when Storage is unavailable)
 
 ✅ **Developer Experience**
 - Comprehensive documentation
@@ -85,12 +85,12 @@ IWOOT stands for **"I Want One Of Those"** and **"I Have One Of Those"**. It's a
 
 2. **Dashboard** (`/dashboard`)
    - Main application page after login
-   - Tabs: **Products**, **Receipts**, **Stores**
+   - Tabs: **Products**, **Receipts**, **Stores**, **Brands**
    - Products: filters (all / want / have), search, sort, grid or table view
    - Selling journey card and nav link to **Sell compare**
 
 3. **Sell compare hub** (`/sell-compare`)
-   - Static reference pages for resale price comparison (e.g. `/sell-compare/airpods-pro-2`)
+   - Static reference pages for resale price comparison (e.g. `/sell-compare/airpods-pro-2`, `/sell-compare/sonos-move-2`)
 
 4. **Admin Dashboard** (`/admin`)
    - User management

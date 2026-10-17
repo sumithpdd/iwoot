@@ -102,16 +102,20 @@ export default function DashboardPage() {
     [user]
   )
 
-  // Timeout to prevent infinite loading (increased to 15 seconds to allow query timeout to trigger first)
+  // Cold Next.js compiles of `/api/*` (Firebase Admin) can take 30–60s on first hit.
+  // Do not wipe products if the request is still in flight — data often arrives after this.
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (loading && !authLoading) {
-        console.warn("[Dashboard] Loading timeout - forcing stop after 15 seconds")
-        setError("Loading is taking longer than expected. Check browser console for detailed errors. The query may be hanging or Firestore may not be accessible.")
+        console.warn(
+          "[Dashboard] Still loading after 60s (often a cold API compile). Waiting for responses…"
+        )
+        setError(
+          "Still loading — first API compile after `npm run dev` can take up to a minute. The page will fill in when products return."
+        )
         setLoading(false)
-        setProducts([]) // Set empty to allow UI to render
       }
-    }, 15000) // 15 second timeout (query timeout is 5 seconds, so this is a fallback)
+    }, 60_000)
 
     return () => clearTimeout(timeout)
   }, [loading, authLoading])
@@ -277,20 +281,6 @@ export default function DashboardPage() {
     )
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading products...</p>
-          {error && (
-            <p className="mt-2 text-red-600 text-sm">{error}</p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900">
       <Toaster />
@@ -331,6 +321,12 @@ export default function DashboardPage() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading && (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-100">
+            Loading products… first load after starting the app can take a little while.
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-800 text-sm">{error}</p>

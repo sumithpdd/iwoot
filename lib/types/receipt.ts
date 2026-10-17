@@ -23,7 +23,9 @@ export interface Receipt {
   items: ReceiptItem[]
   totalAmount: number
   userId: string
-  receiptImage?: string // URL to uploaded receipt image
+  receiptImage?: string // Firebase Storage download URL
+  /** Original invoice (PDF) in Firebase Storage */
+  receiptFile?: string
   notes?: string
   createdAt?: string
   updatedAt?: string

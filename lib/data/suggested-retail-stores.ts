@@ -17,6 +17,7 @@ export const SUGGESTED_RETAIL_STORES: SuggestedRetailStore[] = [
   { name: "Currys", website: "https://www.currys.co.uk/", notes: "UK electronics" },
   { name: "Argos", website: "https://www.argos.co.uk/", notes: "UK retail" },
   { name: "Apple Store", website: "https://www.apple.com/uk/", notes: "Official Apple" },
+  { name: "Sunglass Hut", website: "https://www.sunglasshut.com/uk", notes: "Ray-Ban / Luxottica retail" },
   { name: "Gumtree", website: "https://www.gumtree.com/", notes: "Classifieds" },
   { name: "Facebook Marketplace", website: "https://www.facebook.com/marketplace/", notes: "Local listings" },
   { name: "Vinted", website: "https://www.vinted.co.uk/", notes: "Fashion & more" },

@@ -29,6 +29,8 @@ import {
   CopyToClipboardButton,
   copyFieldText,
 } from "@/components/copy-to-clipboard-button"
+import { uploadImagesViaApi } from "@/lib/api/storage-client"
+import { newClientEntityId } from "@/lib/utils/client-entity-id"
 
 const receiptSchema = z.object({
   receiptNumber: z.string().min(1, "Receipt number is required"),
@@ -69,8 +71,16 @@ export default function ReceiptDialog({
     receipt?.items || (productId ? [{ id: "1", productId, quantity: 1, discountedPrice: 0 }] : [])
   )
   const [receiptImageUrl, setReceiptImageUrl] = useState<string>("")
+  const [receiptFileUrl, setReceiptFileUrl] = useState<string>("")
+  const [pdfUploading, setPdfUploading] = useState(false)
   const [stores, setStores] = useState<Store[]>([])
   const [linkedStoreId, setLinkedStoreId] = useState("")
+  const [entityId, setEntityId] = useState(() => receipt?.id || newClientEntityId())
+
+  useEffect(() => {
+    if (!open) return
+    setEntityId(receipt?.id || newClientEntityId())
+  }, [open, receipt?.id])
 
   const {
     register,
@@ -144,14 +154,17 @@ export default function ReceiptDialog({
       })
       setItems(receipt.items)
       setReceiptImageUrl(receipt.receiptImage || "")
+      setReceiptFileUrl(receipt.receiptFile || "")
       setLinkedStoreId(receipt.storeId || "")
     } else if (productId) {
       setItems([{ id: "1", productId, quantity: 1, discountedPrice: 0 }])
       setReceiptImageUrl("")
+      setReceiptFileUrl("")
       setLinkedStoreId("")
     } else {
       setItems([])
       setReceiptImageUrl("")
+      setReceiptFileUrl("")
       setLinkedStoreId("")
     }
   }, [receipt, productId, reset, open])
@@ -184,6 +197,36 @@ export default function ReceiptDialog({
     return items.reduce((sum, item) => sum + item.discountedPrice * item.quantity, 0)
   }
 
+  const linkedProductId =
+    items.find((item) => item.productId)?.productId || productId || undefined
+
+  const handlePdfSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file || !user) return
+    if (file.type !== "application/pdf") {
+      toast({
+        title: "PDF required",
+        description: "Please choose a PDF invoice.",
+        variant: "destructive",
+      })
+      return
+    }
+    setPdfUploading(true)
+    try {
+      const [url] = await uploadImagesViaApi(getToken, [file], "receipts", {
+        productId: linkedProductId,
+        receiptId: entityId,
+      })
+      setReceiptFileUrl(url)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Upload failed"
+      toast({ title: "Upload failed", description: msg, variant: "destructive" })
+    } finally {
+      setPdfUploading(false)
+    }
+  }
+
   const onSubmit = async (data: ReceiptForm) => {
     if (!user) return
 
@@ -203,6 +246,7 @@ export default function ReceiptDialog({
         totalAmount: calculateTotal(),
         userId: user.uid,
         receiptImage: receiptImageUrl || undefined,
+        receiptFile: receiptFileUrl || undefined,
         storeId: linkedStoreId.trim() || (receipt?.id ? null : undefined),
         storeAddress: data.storeAddress?.trim() || undefined,
         storeWebsite: data.storeWebsite?.trim() || undefined,
@@ -215,7 +259,7 @@ export default function ReceiptDialog({
           description: "Receipt updated.",
         })
       } else {
-        await ReceiptService.createReceipt(getToken, receiptData)
+        await ReceiptService.createReceipt(getToken, receiptData, entityId)
         toast({
           title: "Added",
           description: "Receipt saved.",
@@ -476,6 +520,30 @@ export default function ReceiptDialog({
             </div>
           </div>
 
+          {receiptFileUrl && (
+            <p className="text-sm">
+              <a
+                href={receiptFileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 underline dark:text-blue-400"
+              >
+                Open invoice PDF
+              </a>
+            </p>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="receipt-pdf">Invoice PDF (optional)</Label>
+            <Input
+              id="receipt-pdf"
+              type="file"
+              accept="application/pdf"
+              disabled={!user || pdfUploading}
+              onChange={(e) => void handlePdfSelect(e)}
+            />
+          </div>
+
           <div className="space-y-2">
             <Label>Receipt Image (Optional)</Label>
             <ImageUpload
@@ -484,6 +552,8 @@ export default function ReceiptDialog({
               maxImages={1}
               folder="receipts"
               userId={user?.uid || ""}
+              productId={linkedProductId}
+              receiptId={entityId}
               disabled={!user}
               allowTags={false}
               allowReorder={false}

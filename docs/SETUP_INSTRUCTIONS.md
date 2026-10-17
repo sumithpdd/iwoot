@@ -176,38 +176,8 @@ service cloud.firestore {
 
 ## Step 8: Set Storage Security Rules
 
-1. In Firebase Console, click **Storage** → **Rules** tab
-2. Replace with:
-
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    match /products/{userId}/{fileName} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) 
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(userId);
-    }
-    match /receipts/{userId}/{fileName} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) 
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(userId);
-    }
-  }
-}
-```
-
-3. Click **Publish**
+1. Deploy **`storage.rules`** (`npx firebase deploy --only storage`) or paste that file into Console → **Storage** → **Rules**.
+2. Media lives at `users/{userId}/products/{productId}/images|receipts/`. Do not commit `public/receipts` or `public/catalog`.
 
 ## Step 9: Start Development Server
 

@@ -1,101 +1,41 @@
 # Firebase Storage Setup
 
+Uploads go through **`POST /api/storage/upload`** (Admin SDK). The browser does not write to Storage directly.
+
 ## Enable Firebase Storage
 
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your project
-3. Click **Storage** in the left sidebar
-4. Click **Get started**
-5. Choose **Start in test mode** (for development)
-6. Select a location (same as Firestore if possible)
-7. Click **Done**
+1. Firebase Console → **Storage** → **Get started**
+2. Use the same GCP project as Auth/Firestore (billing must be enabled)
 
-## Security Rules
+## Object layout
 
-Update Storage security rules to allow authenticated users to upload/read their own files:
-
-1. In Firebase Console → **Storage** → **Rules** tab
-2. Replace with:
-
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    
-    // Helper function to check if user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    // Helper function to check if user owns the file
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    // Products folder: Users can only upload/read/delete their own product images
-    match /products/{userId}/{fileName} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) 
-                   && request.resource.size < 5 * 1024 * 1024 // 5MB limit
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(userId);
-    }
-    
-    // Receipts folder: Users can only upload/read/delete their own receipt images
-    match /receipts/{userId}/{fileName} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) 
-                   && request.resource.size < 5 * 1024 * 1024 // 5MB limit
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(userId);
-    }
-  }
-}
+```
+users/{userId}/products/{productId}/images/{timestamp}-{filename}
+users/{userId}/products/{productId}/receipts/{timestamp}-{filename}
+users/{userId}/receipts/{receiptId}/{timestamp}-{filename}
 ```
 
-3. Click **Publish**
+New products/receipts generate a client UUID before the first upload so files land under the same id as the Firestore document (`clientId` on create).
 
-## File Structure
+Do **not** put invoices or personal photos in `public/` or git. `public/receipts/` and `public/catalog/` are gitignored.
 
-Images are stored in Firebase Storage with this structure:
+## Security rules
+
+Canonical file: **`storage.rules`**. Deploy with:
+
+```bash
+npx firebase deploy --only storage
 ```
-/products/{userId}/{timestamp}-{filename}
-/receipts/{userId}/{timestamp}-{filename}
-```
 
-## Features
+Or paste the same rules in Console → Storage → Rules. Uploads via Admin SDK bypass rules; rules still protect any client SDK access.
 
-- ✅ Upload images from device
-- ✅ Add image URLs (for external images)
-- ✅ Preview images before upload
-- ✅ Delete images (removes from Storage)
-- ✅ 5MB file size limit
-- ✅ Image type validation
-- ✅ Multiple images per product (up to 5)
-- ✅ Single receipt image per receipt
+## Limits
+
+- Images: 5MB, `image/*`
+- Receipt PDFs: 10MB, `application/pdf`
 
 ## Troubleshooting
 
-### "Permission denied" when uploading
-- **See [FIREBASE_STORAGE_RULES_FIX.md](./FIREBASE_STORAGE_RULES_FIX.md) for step-by-step fix**
-- Check Storage security rules are published
-- Verify you're logged in
-- Check file size is under 5MB
-- Verify file is an image type
-- Wait 10-30 seconds after publishing rules for propagation
-
-### Images not displaying
-- Check browser console for errors
-- Verify image URLs are valid
-- Check Storage rules allow read access
-
-### Upload fails
-- Check internet connection
-- Verify Firebase Storage is enabled
-- Check file size (max 5MB)
-- Verify file is an image (jpg, png, gif, webp, etc.)
-
-### CORS errors when uploading from localhost
-- See [FIREBASE_STORAGE_CORS_FIX.md](./FIREBASE_STORAGE_CORS_FIX.md) for detailed instructions
-- Quick fix: Run `node setup-cors.js` (after installing @google-cloud/storage)
-
+- **`accountDisabled` / billing**: enable billing on the GCP project.
+- **Permission denied** on a client SDK upload: the app should use `/api/storage/upload`, not the client Storage SDK.
+- **Images not displaying**: download URLs include `alt=media&token=`; `next/image` uses `unoptimized` for these URLs.

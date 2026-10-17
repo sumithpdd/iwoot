@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function allowedMedia() {
+      return request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*')
+            || request.resource.contentType == 'application/pdf');
+    }
+
+    // Canonical layout: users/{uid}/products/{productId}/images|receipts/...
+    match /users/{userId}/{allPaths=**} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && allowedMedia();
+    }
+
+    // Legacy paths (pre per-product layout)
+    match /products/{userId}/{fileName} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && allowedMedia();
+    }
+    match /receipts/{userId}/{fileName} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && allowedMedia();
+    }
+  }
+}

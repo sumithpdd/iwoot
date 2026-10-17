@@ -6,6 +6,7 @@ import {
   badRequest,
 } from "@/lib/server/require-auth"
 import { gatherCatalogHints } from "@/lib/catalog/gather-catalog-hints"
+import { getGeminiModelId } from "@/lib/server/gemini-model"
 
 export const runtime = "nodejs"
 
@@ -72,10 +73,7 @@ export async function POST(request: Request) {
 
   const { summaryForPrompt } = await gatherCatalogHints(current)
 
-  const modelId =
-    process.env.GEMINI_MODEL ||
-    process.env.GOOGLE_GENERATIVE_AI_MODEL ||
-    "gemini-2.5-flash"
+  const modelId = getGeminiModelId()
 
   try {
     const { text } = await generateText({

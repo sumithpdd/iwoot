@@ -3,8 +3,12 @@ import { apiRequest } from "@/lib/api/http"
 export async function uploadImagesViaApi(
   getToken: () => Promise<string | null>,
   files: File[],
-  folder: "products" | "receipts"
+  folder: "products" | "receipts",
+  ids: { productId?: string; receiptId?: string }
 ): Promise<string[]> {
+  if (!ids.productId && !ids.receiptId) {
+    throw new Error("productId or receiptId is required")
+  }
   const urls: string[] = []
   for (const file of files) {
     const token = await getToken()
@@ -13,6 +17,8 @@ export async function uploadImagesViaApi(
     const formData = new FormData()
     formData.append("file", file)
     formData.append("folder", folder)
+    if (ids.productId) formData.append("productId", ids.productId)
+    if (ids.receiptId) formData.append("receiptId", ids.receiptId)
 
     const res = await fetch("/api/storage/upload", {
       method: "POST",

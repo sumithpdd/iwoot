@@ -6,7 +6,6 @@ import {
 import { SellingVenuePriceGrid } from "@/components/selling-venue-price-grid"
 import { AirpodsProductReferencePanel } from "@/components/airpods-product-reference-panel"
 import { Button } from "@/components/ui/button"
-import { SeedAirpodsDemoButton } from "@/components/seed-airpods-demo-button"
 
 export const metadata = {
   title: "AirPods Pro 2 — sell price comparison | IWOOT",
@@ -40,7 +39,6 @@ export default function AirPodsPro2SellComparePage() {
             <Button variant="outline" asChild>
               <Link href="/dashboard">Dashboard</Link>
             </Button>
-            <SeedAirpodsDemoButton />
           </div>
         </div>
 

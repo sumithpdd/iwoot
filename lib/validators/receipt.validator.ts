@@ -3,11 +3,10 @@
  */
 
 import { Receipt } from "@/lib/types/receipt"
+import { isAbsoluteUrl, isReceiptOrHttpAsset } from "@/lib/utils/http-url"
+import type { ValidationResult } from "@/lib/validators/result"
 
-export interface ValidationResult {
-  valid: boolean
-  errors: string[]
-}
+export type { ValidationResult }
 
 export function validateReceipt(
   receipt: Omit<Receipt, "id" | "createdAt" | "updatedAt">
@@ -52,9 +51,12 @@ export function validateReceipt(
     errors.push("User ID is required")
   }
 
-  // Validate receipt image URL if provided
-  if (receipt.receiptImage && !isValidUrl(receipt.receiptImage)) {
+  if (receipt.receiptImage && !isValidReceiptAsset(receipt.receiptImage)) {
     errors.push("Receipt image must be a valid URL")
+  }
+
+  if (receipt.receiptFile && !isValidReceiptAsset(receipt.receiptFile)) {
+    errors.push("Receipt file must be a valid URL")
   }
 
   if (receipt.storeWebsite?.trim() && !isValidUrl(receipt.storeWebsite.trim())) {
@@ -106,8 +108,20 @@ export function validateReceiptUpdate(
     errors.push("Total amount cannot be negative")
   }
 
-  if (updates.receiptImage !== undefined && updates.receiptImage && !isValidUrl(updates.receiptImage)) {
+  if (
+    updates.receiptImage !== undefined &&
+    updates.receiptImage &&
+    !isValidReceiptAsset(updates.receiptImage)
+  ) {
     errors.push("Receipt image must be a valid URL")
+  }
+
+  if (
+    updates.receiptFile !== undefined &&
+    updates.receiptFile &&
+    !isValidReceiptAsset(updates.receiptFile)
+  ) {
+    errors.push("Receipt file must be a valid URL")
   }
 
   if (
@@ -135,12 +149,11 @@ export function validateReceiptUpdate(
 }
 
 function isValidUrl(url: string): boolean {
-  try {
-    new URL(url)
-    return true
-  } catch {
-    return false
-  }
+  return isAbsoluteUrl(url)
+}
+
+function isValidReceiptAsset(src: string): boolean {
+  return isReceiptOrHttpAsset(src)
 }
 
 function isValidDate(dateString: string): boolean {

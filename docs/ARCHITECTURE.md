@@ -1,339 +1,95 @@
 # Architecture & Design Patterns
 
-This document explains the architecture, design patterns, and code organization used in the IWOOT application.
+IWOOT is a Next.js 14 App Router app. **Firebase Auth runs in the browser. All Firestore and Storage writes go through Next.js API routes using the Admin SDK.** The client never uses the Firestore client SDK.
 
-## Table of Contents
-
-1. [Project Structure](#project-structure)
-2. [Design Patterns](#design-patterns)
-3. [Code Organization](#code-organization)
-4. [Key Concepts](#key-concepts)
-5. [Data Flow](#data-flow)
-
-## Project Structure
+## Layers
 
 ```
-iwoot/
-├── app/                    # Next.js App Router (pages)
-│   ├── api/               # API routes
-│   ├── dashboard/         # Dashboard (products, receipts, stores tabs)
-│   ├── sell-compare/      # Static resale price compare hub + product pages
-│   ├── login/             # Login page
-│   ├── admin/             # Admin page
-│   └── layout.tsx         # Root layout
-│
-├── components/            # React components
-│   ├── ui/               # Reusable UI components (shadcn/ui)
-│   ├── product-dialog.tsx # Product form (lookup, rich text, specs, images, selling)
-│   ├── product-list.tsx  # Product list display
-│   ├── product-lookup.tsx # Product search and auto-fill component
-│   ├── selling-journey-card.tsx
-│   ├── selling-venue-price-grid.tsx
-│   ├── rich-text-editor.tsx
-│   ├── product-description-display.tsx
-│   ├── product-specifications-editor.tsx
-│   └── ...
-│
-├── lib/                   # Core libraries and utilities
-│   ├── firebase/         # Firebase integration (Repository Layer)
-│   │   ├── config.ts     # Firebase initialization
-│   │   ├── products.ts   # Product CRUD operations
-│   │   ├── receipts.ts   # Receipt CRUD operations
-│   │   └── storage.ts    # Image upload operations
-│   │
-│   ├── data/             # Static reference data (e.g. sell-compare venue rows)
-│   ├── services/         # Business Logic Layer
-│   │   ├── product.service.ts
-│   │   ├── receipt.service.ts
-│   │   ├── store.service.ts
-│   │   └── product-lookup.service.ts  # Product lookup from external APIs
-│   │
-│   ├── validators/        # Validation logic
-│   │   ├── product.validator.ts
-│   │   └── receipt.validator.ts
-│   │
-│   ├── hooks/            # Custom React hooks
-│   │   └── use-products.ts
-│   │
-│   ├── types/            # TypeScript type definitions
-│   │   ├── product.ts
-│   │   ├── receipt.ts
-│   │   └── store.ts
-│   │
-│   └── utils.ts          # Utility functions
-│
-└── docs/                 # Documentation
+React UI (client components)
+        │  Bearer ID token
+        ▼
+lib/services/*          ← typed fetch helpers + client-side validation
+        │  /api/*
+        ▼
+app/api/*               ← verify token, authorize, validate, audit
+        │
+        ▼
+lib/server/repositories ← Admin SDK only (Firestore)
+lib/server/storage-admin
 ```
 
-## Design Patterns
+| Layer | Location | Allowed to do |
+| --- | --- | --- |
+| UI | `components/`, `app/**/page.tsx` with `"use client"` | Forms, lists, call services. No Admin SDK, no Firestore. |
+| Client SDK | `lib/firebase/config.ts` | **Auth (and Analytics) only.** |
+| Services | `lib/services/*.service.ts` | `fetch` `/api/…` with `Authorization: Bearer`. |
+| API | `app/api/**/route.ts` | `runtime = "nodejs"`. Verify ID token. |
+| Repositories | `lib/server/repositories/` | Admin Firestore. Never import from client components. |
 
-### 1. Service Layer Pattern
+## Data: inventory vs static reference
 
-**Purpose**: Separate business logic from UI and data access layers.
+**Source of truth for what the user owns** is Firestore (`products`, `receipts`, `stores`, `brands`), scoped by `userId`.
 
-**Location**: `lib/services/`
+`lib/data/` is **static sell-compare copy** (venue price grids, listing presets, suggested store names). It is **not** the user’s tracker. Do not duplicate live products there. `/sell-compare` pages must not seed Firestore.
 
-**Example**:
-```typescript
-// lib/services/product.service.ts
-export class ProductService {
-  static async createProduct(productData) {
-    // 1. Validate input
-    const validation = validateProduct(productData)
-    if (!validation.valid) {
-      throw new Error(validation.errors.join(", "))
-    }
-    
-    // 2. Call repository
-    return await productRepository.createProduct(productData)
-  }
-}
-```
+Intentional Firestore denormalization (not duplication to remove):
 
-**Benefits**:
-- Centralized business logic
-- Easier to test
-- Reusable across components
-- Single source of truth for operations
+- Product `brand` string + optional `brandId`
+- Have product `purchaseLocation` + optional `storeId`
 
-### 2. Repository Pattern
+Lists stay readable without joins. Keep the string in sync when the user picks a profile.
 
-**Purpose**: Abstract data access layer from business logic.
+## Request flow
 
-**Location**: `lib/firebase/`
+**Create / update product**
 
-**Example**:
-```typescript
-// lib/firebase/products.ts
-export async function createProduct(product) {
-  // Direct Firebase operations
-  const docRef = await addDoc(collection(db, "products"), productData)
-  return docRef.id
-}
-```
+1. `ProductDialog` — React Hook Form + Zod (UX only).
+2. `ProductService` — `validateProduct` then `POST`/`PATCH` `/api/products`.
+3. API — `getAuthContext`, strip client `userId`/`id`, verify `storeId`/`brandId` ownership, `validateProduct` again, repository write.
 
-**Benefits**:
-- Database-agnostic business logic
-- Easy to swap data sources
-- Centralized data access
+**AI chat + MCP**
 
-### 3. Custom Hooks Pattern
+- In-app Gemini (`POST /api/chat`): inventory context + tools (`list_inventory`, `get_sell_compare`, `draft_listing`).
+- MCP (`POST /api/mcp`): same tools for Claude / ChatGPT / Cursor. Auth: Firebase ID token or `IWOOT_MCP_TOKEN` + `IWOOT_MCP_USER_ID`. See `docs/MCP.md`.
+- Sell-compare is static UK reference (Gumtree / CeX / Shpock). Primary pages: `/sell-compare/sonos-move`, `/sell-compare/nebula-cosmos-max`.
 
-**Purpose**: Encapsulate component logic and state management.
+## React / Next.js conventions
 
-**Location**: `lib/hooks/`
+- Default Server Components for static pages (`/sell-compare`). Interactive dashboard/dialogs are client components.
+- One concern per module: dialogs submit through services; API routes do not render UI.
+- Do not add unused hooks. Dashboard loads products/receipts/stores/brands together in the page — that is the container. Extract a hook only when two screens share the same state machine.
+- Images: Firebase Storage at `users/{uid}/products/{productId}/images|receipts/…`. Never commit `public/receipts` or `public/catalog`.
 
-**Example**:
-```typescript
-// lib/hooks/use-products.ts
-export function useProducts() {
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(false)
-  
-  const loadProducts = async () => {
-    setLoading(true)
-    const data = await ProductService.getProducts(userId)
-    setProducts(data)
-    setLoading(false)
-  }
-  
-  return { products, loading, loadProducts }
-}
-```
+## Firebase conventions
 
-**Benefits**:
-- Reusable logic across components
-- Clean component code
-- Easy to test
+- Security rules still require `userId == auth.uid` for client access; production data access is Admin SDK after token verify.
+- Never commit `firebase-service-account.json`, `.env.local`, or one-off Admin scripts.
+- One-off inventory patches belong in gitignored `.local-admin/` (see project skill `iwoot-local-admin`).
 
-### 4. Validation Layer
+## Validation
 
-**Purpose**: Centralized input validation.
+| Where | Role |
+| --- | --- |
+| Zod in dialogs | Immediate form errors |
+| `lib/validators/*` | Shared rules; **API is authoritative** |
+| `lib/utils/http-url.ts` | Absolute URLs vs `/catalog/` and `/receipts/` paths |
 
-**Location**: `lib/validators/`
+Do not copy `isValidUrl` into each validator.
 
-**Example**:
-```typescript
-// lib/validators/product.validator.ts
-export function validateProduct(product) {
-  const errors = []
-  if (!product.name) errors.push("Name required")
-  if (product.price <= 0) errors.push("Price must be positive")
-  return { valid: errors.length === 0, errors }
-}
-```
+## Ownership FKs
 
-**Benefits**:
-- Consistent validation
-- Reusable validation rules
-- Clear error messages
+`verifyStoreIdForUser` / `verifyBrandIdForUser` wrap `verifyOwnedIdForUser`. Empty id clears the link; a set id must exist and belong to the caller.
 
-## Code Organization
+## What not to add
 
-### Layer Separation
+- Client Firestore CRUD (`lib/firebase/products.ts` does not exist).
+- `/api/seed/*` routes or dashboard “seed demo” buttons.
+- Committed `scripts/*.mjs` that hardcode UIDs, emails, or invoices.
+- A second product list in `lib/data` that mirrors Firestore.
 
-The application follows a **layered architecture**:
+## Related docs
 
-```
-┌─────────────────────────────────┐
-│   Presentation Layer            │  ← Components (UI)
-│   (React Components)            │
-└──────────────┬──────────────────┘
-               │
-┌──────────────▼──────────────────┐
-│   Business Logic Layer          │  ← Services
-│   (Business Rules, Validation)  │
-└──────────────┬──────────────────┘
-               │
-┌──────────────▼──────────────────┐
-│   Data Access Layer             │  ← Repositories (Firebase)
-│   (Database Operations)         │
-└─────────────────────────────────┘
-```
-
-### Component Structure
-
-**Smart Components** (Container Components):
-- Manage state
-- Handle business logic
-- Connect to services
-- Example: `app/dashboard/page.tsx`
-
-**Dumb Components** (Presentational Components):
-- Receive props
-- Display data
-- Emit events
-- Example: `components/product-list.tsx`
-
-### File Naming Conventions
-
-- **Components**: `kebab-case.tsx` (e.g., `product-dialog.tsx`)
-- **Services**: `kebab-case.service.ts` (e.g., `product.service.ts`)
-- **Hooks**: `use-kebab-case.ts` (e.g., `use-products.ts`)
-- **Types**: `kebab-case.ts` (e.g., `product.ts`)
-- **Utils**: `kebab-case.ts` (e.g., `product.validator.ts`)
-
-## Key Concepts
-
-### 1. Client-Side Authentication
-
-**Why**: Firebase Auth handles authentication client-side, providing secure token management.
-
-**How it works**:
-1. User logs in via Firebase Auth
-2. Firebase returns an ID token
-3. Token is stored in browser
-4. Token is sent with every Firestore request
-5. Firestore security rules validate the token
-
-**Location**: `lib/auth-context.tsx`
-
-### 2. Security Rules
-
-**Purpose**: Database-level security to prevent unauthorized access.
-
-**Location**: Firebase Console → Firestore → Rules
-
-**Pattern**:
-```javascript
-match /products/{productId} {
-  allow read: if request.auth.uid == resource.data.userId;
-  allow write: if request.auth.uid == request.resource.data.userId;
-}
-```
-
-### 3. Environment Variables
-
-**Purpose**: Keep sensitive data out of source code.
-
-**Pattern**: All Firebase config uses `NEXT_PUBLIC_*` environment variables.
-
-**Location**: `.env.local` (not committed to Git)
-
-### 4. Type Safety
-
-**Purpose**: Catch errors at compile time.
-
-**Pattern**: TypeScript interfaces for all data structures.
-
-**Example**:
-```typescript
-interface Product {
-  id: string
-  name: string
-  price: number
-  // ...
-}
-```
-
-## Data Flow
-
-### Creating a Product
-
-```
-1. User fills form (ProductDialog)
-   ↓
-2. Form validation (Zod schema)
-   ↓
-3. Component calls ProductService.createProduct()
-   ↓
-4. Service validates data (product.validator.ts)
-   ↓
-5. Service calls productRepository.createProduct()
-   ↓
-6. Repository saves to Firestore
-   ↓
-7. Success/Error returned to component
-   ↓
-8. Component shows toast notification
-   ↓
-9. Component reloads product list
-```
-
-### Loading Products
-
-```
-1. Component mounts (Dashboard)
-   ↓
-2. Component calls useProducts() hook
-   ↓
-3. Hook calls ProductService.getProducts()
-   ↓
-4. Service calls productRepository.getProducts()
-   ↓
-5. Repository queries Firestore
-   ↓
-6. Data returned through layers
-   ↓
-7. Hook updates state
-   ↓
-8. Component re-renders with data
-```
-
-## Best Practices
-
-### ✅ DO
-
-- Use services for business logic
-- Validate all inputs
-- Handle errors gracefully
-- Use TypeScript types
-- Keep components focused
-- Use custom hooks for reusable logic
-- Follow naming conventions
-
-### ❌ DON'T
-
-- Put business logic in components
-- Access Firebase directly from components
-- Skip validation
-- Hardcode credentials
-- Mix concerns (UI + business logic)
-- Ignore TypeScript errors
-
-## Next Steps
-
-- Read `docs/DEVELOPER_GUIDE.md` for detailed coding guidelines
-- Check `docs/SECURITY.md` for security best practices
-- Review `docs/QUICK_REFERENCE.md` for code snippets
-
+- `docs/DEVELOPER_GUIDE.md` — file map
+- `docs/QUICK_REFERENCE.md` — service call snippets
+- `docs/FIRESTORE_RULES.md` — rules
+- `docs/SELLING_AND_COMPARE.md` — static compare pages

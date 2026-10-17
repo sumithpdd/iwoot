@@ -2,10 +2,11 @@ import Link from "next/link"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Scale } from "lucide-react"
+import { SELL_COMPARE_CATALOG } from "@/lib/data/sell-compare-catalog"
 
 export const metadata = {
   title: "Resale price compare | IWOOT",
-  description: "Reference price grids for second-hand marketplaces.",
+  description: "Reference price grids for Gumtree, CeX, Shpock, and more.",
 }
 
 export default function SellCompareHubPage() {
@@ -20,7 +21,8 @@ export default function SellCompareHubPage() {
               Price compare hub
             </h1>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              Static reference pages — edit data in the repo when you check each marketplace. Not live scraping.
+              Static reference for Gumtree, CeX, and Shpock — edit repo data when you re-check. Not
+              live scraping. Your saved tracker is on the dashboard.
             </p>
           </div>
           <Button variant="outline" asChild>
@@ -28,20 +30,22 @@ export default function SellCompareHubPage() {
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Apple AirPods Pro 2</CardTitle>
-            <CardDescription>
-              Back Market, CeX, Gumtree, Shpock — side-by-side grid with links.
-            </CardDescription>
-            <Button className="mt-4 w-fit" asChild>
-              <Link href="/sell-compare/airpods-pro-2">
-                Open comparison
-                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
-              </Link>
-            </Button>
-          </CardHeader>
-        </Card>
+        <div className="space-y-4">
+          {SELL_COMPARE_CATALOG.map((entry) => (
+            <Card key={entry.slug}>
+              <CardHeader>
+                <CardTitle className="text-base">{entry.title}</CardTitle>
+                <CardDescription>{entry.blurb}</CardDescription>
+                <Button className="mt-4 w-fit" asChild>
+                  <Link href={entry.path}>
+                    Open comparison
+                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+                  </Link>
+                </Button>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   )

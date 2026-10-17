@@ -2,47 +2,42 @@
 
 Quick lookup for common tasks and code snippets.
 
-## Firebase Operations
+## Product operations (client)
 
-### Get All Products
+All product I/O goes through `ProductService` (Bearer token → `/api/products`). Do not import Firestore in components.
+
 ```typescript
-import { getProducts } from "@/lib/firebase/products"
+import { ProductService } from "@/lib/services/product.service"
 
-const products = await getProducts(userId)
-const wantProducts = await getProducts(userId, "want")
-const haveProducts = await getProducts(userId, "have")
+const products = await ProductService.getProducts(getToken)
+const wantProducts = await ProductService.getProducts(getToken, "want")
+const haveProducts = await ProductService.getProducts(getToken, "have")
 ```
 
 ### Create Product
 ```typescript
-import { createProduct } from "@/lib/firebase/products"
-
-await createProduct({
+await ProductService.createProduct(getToken, {
   name: "iPad Pro",
   brand: "Apple",
   website: "https://example.com",
   originalPrice: 999,
   type: "want",
   userId: user.uid,
-  date: new Date().toISOString().split("T")[0]
+  date: new Date().toISOString().split("T")[0],
 })
 ```
 
 ### Update Product
 ```typescript
-import { updateProduct } from "@/lib/firebase/products"
-
-await updateProduct(productId, {
+await ProductService.updateProduct(getToken, productId, {
   name: "Updated Name",
-  originalPrice: 899
+  originalPrice: 899,
 })
 ```
 
 ### Delete Product
 ```typescript
-import { deleteProduct } from "@/lib/firebase/products"
-
-await deleteProduct(productId)
+await ProductService.deleteProduct(getToken, productId)
 ```
 
 ## Product descriptions (HTML) and specs
@@ -56,8 +51,15 @@ Product validation for long HTML and spec maps: `lib/validators/product.validato
 ## Sell compare (static pages)
 
 - **Hub**: `/sell-compare`
-- **Example product page**: `/sell-compare/airpods-pro-2`
-- **Data**: `lib/data/airpods-pro-2-venue-prices.ts` — edit `AIRPODS_PRO_2_VENUE_ROWS` to change venue URLs, GBP amounts, and notes.
+- **Product pages**:
+  - `/sell-compare/airpods-pro-2`
+  - `/sell-compare/sonos-move-2`
+- **Shared types**: `lib/data/venue-price-types.ts`
+- **Data**:
+  - `lib/data/airpods-pro-2-venue-prices.ts` → `AIRPODS_PRO_2_VENUE_ROWS`
+  - `lib/data/sonos-move-2-venue-prices.ts` → `SONOS_MOVE_2_VENUE_ROWS` (Gumtree £275 / £300 examples + Shpock search)
+
+Edit venue URLs, GBP amounts, notes, and `lastCheckedIso` when you re-verify each site.
 
 ## Product Lookup
 
@@ -306,9 +308,11 @@ import { cn } from "@/lib/utils"
 // Types
 import { Product } from "@/lib/types/product"
 
-// Firebase
-import { auth, db } from "@/lib/firebase/config"
-import { getProducts } from "@/lib/firebase/products"
+// Firebase Auth
+import { auth } from "@/lib/firebase/config"
+
+// Data
+import { ProductService } from "@/lib/services/product.service"
 
 // Hooks
 import { useAuth } from "@/lib/auth-context"

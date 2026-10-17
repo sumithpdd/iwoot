@@ -36,6 +36,14 @@ iwoot-service-account.json
 firebase-keys/
 **/firebase-keys/
 
+# One-off Admin SDK / inventory scripts (never publish — UIDs, invoices, PII)
+/scripts/
+/.local-admin/
+
+# User media — Firebase Storage only (invoices, personal photos)
+/public/receipts/
+/public/catalog/
+
 # vercel
 .vercel
 

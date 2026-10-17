@@ -44,6 +44,17 @@ Add each of these variables (click **Add** for each one):
    - Value: Your Measurement ID (for Analytics)
    - Environments: ✅ Production, ✅ Preview, ✅ Development
 
+8. **FIREBASE_SERVICE_ACCOUNT_JSON** (required for `/api/*` on Vercel)
+   - Value: the **full JSON** of your Firebase service account key, as a single line
+   - Environments: ✅ Production, ✅ Preview
+   - Do **not** use `FIREBASE_SERVICE_ACCOUNT_PATH` on Vercel (no local key file)
+   - Same project as `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+
+9. **GOOGLE_GENERATIVE_AI_API_KEY** (optional — AI assist / chat)
+   - Environments: ✅ Production, ✅ Preview
+10. **GEMINI_MODEL** (optional — default `gemini-flash-latest`)
+   - Do not use `gemini-2.5-flash` for new Google AI Studio keys; that id is blocked for new users.
+
 ## Step 3: Redeploy
 
 After adding all variables:

@@ -233,35 +233,16 @@ service cloud.firestore {
 
 ### Storage Security Rules
 
-Set in Firebase Console → Storage → Rules:
+Canonical rules live in **`storage.rules`**. Deploy with `npx firebase deploy --only storage`, or paste that file into Firebase Console → Storage → Rules.
 
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    match /products/{userId}/{fileName} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) 
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(userId);
-    }
-    match /receipts/{userId}/{fileName} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) 
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(userId);
-    }
-  }
-}
+Objects are stored per user and product:
+
 ```
+users/{userId}/products/{productId}/images/…
+users/{userId}/products/{productId}/receipts/…
+```
+
+Do not commit invoices or product photos (`public/receipts` and `public/catalog` are gitignored).
 
 ## 🚀 Deployment
 

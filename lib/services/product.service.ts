@@ -43,7 +43,8 @@ export class ProductService {
 
   static async createProduct(
     getToken: () => Promise<string | null>,
-    productData: Omit<Product, "id" | "createdAt" | "updatedAt">
+    productData: Omit<Product, "id" | "createdAt" | "updatedAt">,
+    clientId?: string
   ): Promise<string> {
     const validation = validateProduct(productData)
     if (!validation.valid) {
@@ -53,7 +54,7 @@ export class ProductService {
     try {
       const res = await apiRequest<{ id: string }>(getToken, "/api/products", {
         method: "POST",
-        body: JSON.stringify(productData),
+        body: JSON.stringify({ ...productData, clientId }),
       })
       return res.id
     } catch (error: unknown) {

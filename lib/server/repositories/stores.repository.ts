@@ -57,6 +57,16 @@ export async function deleteStoreDoc(storeId: string): Promise<void> {
   await db.collection(COLLECTION).doc(storeId).delete()
 }
 
+export async function findStoreByNameForUser(
+  userId: string,
+  name: string
+): Promise<Store | null> {
+  const normalized = name.trim().toLowerCase()
+  if (!normalized) return null
+  const list = await listStoresByUser(userId)
+  return list.find((s) => s.name.trim().toLowerCase() === normalized) ?? null
+}
+
 export async function assertStoreOwnedByUser(
   storeId: string,
   userId: string

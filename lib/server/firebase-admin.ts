@@ -48,7 +48,10 @@ function readServiceAccountFile(filePath: string): admin.ServiceAccount {
 }
 
 export function getAdminApp(): admin.app.App {
-  if (initialized && admin.apps.length > 0) {
+  // Next.js HMR resets this module's `initialized` flag while the Admin SDK
+  // singleton may already exist — reusing it avoids `app/invalid-app-options` / 401s.
+  if (admin.apps.length > 0) {
+    initialized = true
     return admin.app()
   }
 

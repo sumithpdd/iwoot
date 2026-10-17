@@ -46,6 +46,20 @@ export async function createReceiptDoc(
   return ref.id
 }
 
+export async function createReceiptDocWithId(
+  receiptId: string,
+  data: Omit<Receipt, "id" | "createdAt" | "updatedAt">
+): Promise<string> {
+  const db = getAdminFirestore()
+  const now = new Date().toISOString()
+  await db.collection(COLLECTION).doc(receiptId).create({
+    ...data,
+    createdAt: now,
+    updatedAt: now,
+  })
+  return receiptId
+}
+
 export async function updateReceiptDoc(
   receiptId: string,
   updates: Record<string, unknown>

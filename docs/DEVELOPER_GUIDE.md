@@ -135,12 +135,11 @@ const onSubmit = (data) => {
 
 ### `/app/page.tsx`
 
-**Purpose**: Home page (redirects to dashboard or login)
+**Purpose**: Marketing / landing page (Sign in and Dashboard links)
 
 **Key Points**:
 - Server component (no `"use client"`)
-- Checks authentication
-- Redirects based on auth status
+- Does not load the product list; signed-in users open `/dashboard`
 
 ### `/app/login/page.tsx`
 
@@ -188,38 +187,20 @@ const onSubmit = (data) => {
 **Why check `typeof window`?**
 - Server-side rendering doesn't have `window`
 - Firebase client SDK needs browser environment
+- This file exports **Auth only** — not Firestore
 
-### `/lib/firebase/products.ts`
+### `/lib/services/product.service.ts` and `/lib/server/repositories/products.repository.ts`
 
-**Purpose**: All database operations for products
+**Purpose**: Product CRUD. The browser never talks to Firestore.
 
-**Functions**:
+- **Service** (client): `ProductService.getProducts(getToken, type?)` → `GET /api/products`
+- **API** (`app/api/products`): verifies the ID token, validates, writes via Admin SDK
+- **Repository** (server only): `listProductsByUser`, `createProductDoc`, `updateProductDoc`, …
 
 ```typescript
-// Get all products for a user
-getProducts(userId: string, type?: "want" | "have")
+import { ProductService } from "@/lib/services/product.service"
 
-// Get single product
-getProduct(productId: string)
-
-// Create new product
-createProduct(product: Product)
-
-// Update existing product
-updateProduct(productId: string, updates: Partial<Product>)
-
-// Delete product
-deleteProduct(productId: string)
-
-// Add price history entry
-addPriceHistory(productId: string, price: number, website: string)
-```
-
-**How to use**:
-```typescript
-import { getProducts } from "@/lib/firebase/products"
-
-const products = await getProducts(user.uid, "want")
+const products = await ProductService.getProducts(getToken, "have")
 ```
 
 ### `/lib/auth-context.tsx`
@@ -255,7 +236,7 @@ if (!user) return <Login />
 
 ### `/app/sell-compare/page.tsx` and `/app/sell-compare/.../page.tsx`
 
-**Purpose**: Static **resale price compare** routes (no server scrape). Hub lists comparison pages; each page uses `SellingVenuePriceGrid` fed from **`lib/data/*.ts`** (e.g. `airpods-pro-2-venue-prices.ts`). Update rows and `lastCheckedIso` manually when refreshing reference prices.
+**Purpose**: Static **resale price compare** routes (no server scrape). Hub lists comparison pages; each page uses `SellingVenuePriceGrid` fed from **`lib/data/*-venue-prices.ts`** (shared types in `venue-price-types.ts`). Examples: AirPods Pro 2, Sonos Move 2. Update rows and `lastCheckedIso` manually when refreshing reference prices.
 
 ### `/components/selling-journey-card.tsx`
 
@@ -486,9 +467,11 @@ import { Button } from "@/components/ui/button"
 // Utilities
 import { cn } from "@/lib/utils"
 
-// Firebase
-import { auth, db } from "@/lib/firebase/config"
-import { getProducts } from "@/lib/firebase/products"
+// Firebase Auth (browser only)
+import { auth } from "@/lib/firebase/config"
+
+// Products (REST + Admin SDK on the server)
+import { ProductService } from "@/lib/services/product.service"
 
 // Types
 import { Product } from "@/lib/types/product"
@@ -498,24 +481,16 @@ import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 ```
 
-### Common Firebase Operations
+### Common data operations
+
+Use **API routes + services**, not the Firestore client SDK from React:
 
 ```typescript
-// Get collection
-const snapshot = await getDocs(collection(db, "products"))
-
-// Get document
-const doc = await getDoc(doc(db, "products", id))
-
-// Add document
-await addDoc(collection(db, "products"), data)
-
-// Update document
-await updateDoc(doc(db, "products", id), updates)
-
-// Delete document
-await deleteDoc(doc(db, "products", id))
+await ProductService.getProducts(getToken)
+await ProductService.createProduct(getToken, data)
 ```
+
+Server-only Admin examples live in `lib/server/repositories/` (never import those from client components).
 
 ### Common React Patterns
 

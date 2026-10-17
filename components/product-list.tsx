@@ -160,7 +160,8 @@ export default function ProductList({
               return (
               <TableRow 
                 key={product.id} 
-                className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+                onClick={() => onEdit(product)}
               >
                 <TableCell className="align-top">
                   {imageEntries.length > 0 ? (
@@ -177,6 +178,10 @@ export default function ProductList({
                             fill
                             className="object-cover"
                             unoptimized
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.style.display = "none"
+                            }}
                           />
                         </div>
                       ))}
@@ -199,7 +204,9 @@ export default function ProductList({
                       className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1"
                     />
                     {product.website?.trim() && (
-                      <WebsiteLinkPreview url={product.website} compact className="text-xs" />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <WebsiteLinkPreview url={product.website} compact className="text-xs" />
+                      </div>
                     )}
                   </div>
                 </TableCell>
@@ -354,6 +361,15 @@ export default function ProductList({
         return (
         <Card 
           key={product.id} 
+          role="button"
+          tabIndex={0}
+          onClick={() => onEdit(product)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              onEdit(product)
+            }
+          }}
           className="overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-blue-300 dark:hover:border-blue-700 group cursor-pointer"
         >
           {/* Product images */}
@@ -388,6 +404,10 @@ export default function ProductList({
                         fill
                         className="object-cover"
                         unoptimized
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = "none"
+                        }}
                       />
                       {im.tags && im.tags.length > 0 && (
                         <span className="absolute bottom-0 left-0 right-0 truncate bg-black/65 px-0.5 text-center text-[10px] leading-tight text-white">
@@ -453,7 +473,7 @@ export default function ProductList({
               )}
             </div>
             {product.website?.trim() && (
-              <div className="mt-2 px-1">
+              <div className="mt-2 px-1" onClick={(e) => e.stopPropagation()}>
                 <WebsiteLinkPreview url={product.website} compact />
               </div>
             )}
@@ -584,23 +604,28 @@ export default function ProductList({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div
+              className="flex gap-2 pt-4 border-t border-gray-200 dark:border-gray-700"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(product)}
+                className="flex-1 hover:bg-blue-50 hover:border-blue-300 dark:hover:bg-blue-900/20 dark:hover:border-blue-700 transition-all duration-200"
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                Details
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => window.open(product.website, "_blank")}
-                className="flex-1 hover:bg-blue-50 hover:border-blue-300 dark:hover:bg-blue-900/20 dark:hover:border-blue-700 transition-all duration-200"
-              >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                View
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => onEdit(product)}
                 className="hover:bg-green-50 hover:border-green-300 dark:hover:bg-green-900/20 dark:hover:border-green-700 transition-all duration-200"
+                title="Open product website"
               >
-                <Edit className="h-4 w-4" />
+                <ExternalLink className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"

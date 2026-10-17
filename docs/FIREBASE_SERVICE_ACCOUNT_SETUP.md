@@ -94,5 +94,6 @@ If logs show `verifyIdToken failed: app/invalid-app-options`, common causes are:
 1. Service account JSON is for a **different** project than `NEXT_PUBLIC_FIREBASE_PROJECT_ID`.
 2. **`private_key`** mangled in a one-line `FIREBASE_SERVICE_ACCOUNT_JSON` (escaped `\n`). Prefer `FIREBASE_SERVICE_ACCOUNT_PATH=firebase-service-account.json` in `.env.local`.
 3. Restart `npm run dev` after fixing credentials.
+4. **Intermittent 401 after routes compile** — Next.js HMR can break Admin init. Prefer `FIREBASE_SERVICE_ACCOUNT_PATH` over a one-line `FIREBASE_SERVICE_ACCOUNT_JSON`, and fully restart the dev server (`Ctrl+C`, then `npm run dev`) if APIs flip from 200 → 401.
 
 See **`docs/FIRESTORE_PRODUCT_EXAMPLE.md`** for an example Firestore `products` document shape (no real user data).

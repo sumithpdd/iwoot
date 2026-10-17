@@ -7,24 +7,9 @@
  * - Backmarket: use their sell/refurb flow for a quote (condition-dependent).
  */
 
-export type VenuePriceKind =
-  | "peer_listing"
-  | "platform_buyback"
-  | "trade_in"
-  | "refurb_buy_box"
+import type { VenuePriceRow } from "@/lib/data/venue-price-types"
 
-export type VenuePriceRow = {
-  id: string
-  venue: string
-  kind: VenuePriceKind
-  /** GBP; null when not reliably available without a live browser session */
-  priceGbp: number | null
-  priceLabel: string
-  url: string
-  /** ISO date you last verified or scraped */
-  lastCheckedIso: string
-  notes?: string
-}
+export type { VenuePriceKind, VenuePriceRow } from "@/lib/data/venue-price-types"
 
 export const AIRPODS_PRO_2_PRODUCT_TITLE =
   'Apple AirPods Pro 2 (2nd gen, USB‑C / MagSafe case — check exact SKU on each site)'

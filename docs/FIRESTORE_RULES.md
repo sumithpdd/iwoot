@@ -102,6 +102,50 @@ service cloud.firestore {
 1. Click **Publish** button
 2. Wait for confirmation that rules are published
 
+### Or publish from the command line (recommended for repos)
+
+1. Install the Firebase CLI (once): `npm install -g firebase-tools`
+2. Sign in: `firebase login`
+3. In the project root, ensure you have:
+   - **`firestore.rules`** — paste the rules block from Step 2 into this file
+   - **`firebase.json`** with a Firestore entry, for example:
+
+```json
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}
+```
+
+   - **`.firebaserc`** with your project id:
+
+```json
+{
+  "projects": {
+    "default": "your-firebase-project-id"
+  }
+}
+```
+
+   If those files are missing, run `firebase init firestore` and choose / create `firestore.rules`.
+
+4. Deploy **rules only**:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+5. Deploy **rules + indexes** (when you also maintain `firestore.indexes.json`):
+
+```bash
+firebase deploy --only firestore
+```
+
+Use `--project your-firebase-project-id` if you need to override the default in `.firebaserc`.
+
+Admin SDK API routes in this app do **not** depend on client Firestore rules for product CRUD, but client-side or future direct SDK access and any console testing still need rules that match the collections above (`products`, `receipts`, `stores`, `brands`).
+
 ### Step 4: Test
 1. Refresh your application
 2. The permission errors should be gone
