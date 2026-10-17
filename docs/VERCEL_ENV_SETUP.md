@@ -54,6 +54,10 @@ Add each of these variables (click **Add** for each one):
    - Environments: ✅ Production, ✅ Preview
 10. **GEMINI_MODEL** (optional — default `gemini-flash-latest`)
    - Do not use `gemini-2.5-flash` for new Google AI Studio keys; that id is blocked for new users.
+11. **IWOOT_MCP_TOKEN** (optional — Claude / ChatGPT MCP at `/api/mcp`)
+   - Long random secret; Environments: ✅ Production, ✅ Preview
+12. **IWOOT_MCP_USER_ID** (optional — Firebase uid for the MCP token)
+   - Your signed-in user’s Firebase Auth uid; Environments: ✅ Production, ✅ Preview
 
 ## Step 3: Redeploy
 
