@@ -4,11 +4,16 @@ import { useCallback, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Upload, X, Image as ImageIcon, ChevronUp, ChevronDown } from "lucide-react"
+import { Upload, X, Image as ImageIcon, ChevronUp, ChevronDown, Download, Loader2 } from "lucide-react"
 import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
-import { uploadImagesViaApi, deleteImageViaApi } from "@/lib/api/storage-client"
+import {
+  uploadImagesViaApi,
+  deleteImageViaApi,
+  downloadProductPhotosZip,
+} from "@/lib/api/storage-client"
 import type { ProductImageEntry } from "@/lib/types/product"
+import { useToast } from "@/hooks/use-toast"
 
 const MAX_TAG_LEN = 50
 const MAX_TAGS = 20
@@ -41,13 +46,35 @@ export default function ImageUpload({
   allowReorder = true,
 }: ImageUploadProps) {
   const { user } = useAuth()
+  const { toast } = useToast()
   const getToken = useCallback(
     () => user?.getIdToken() ?? Promise.resolve(null),
     [user]
   )
   const [uploading, setUploading] = useState(false)
+  const [downloadingZip, setDownloadingZip] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [tagDraft, setTagDraft] = useState<Record<number, string>>({})
+
+  const handleDownloadAll = async () => {
+    if (!productId || images.length === 0) return
+    setDownloadingZip(true)
+    try {
+      await downloadProductPhotosZip(getToken, productId, images)
+      toast({
+        title: "Photos downloaded",
+        description: "Zip saved — use these files when posting on Gumtree or other sites.",
+      })
+    } catch (e: unknown) {
+      toast({
+        title: "Download failed",
+        description: e instanceof Error ? e.message : "Could not download photos",
+        variant: "destructive",
+      })
+    } finally {
+      setDownloadingZip(false)
+    }
+  }
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -145,12 +172,32 @@ export default function ImageUpload({
 
   return (
     <div className="space-y-2">
-      <div>
-        <Label>Images</Label>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Drag in files or add a URL. Reorder so your best photo is first. Optional tags help you remember (e.g.
-          &quot;serial&quot;, &quot;defect&quot;).
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <Label>Images</Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Drag in files or add a URL. Reorder so your best photo is first. Optional tags help you remember (e.g.
+            &quot;serial&quot;, &quot;defect&quot;).
+          </p>
+        </div>
+        {folder === "products" && productId && images.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            disabled={downloadingZip || disabled}
+            onClick={() => void handleDownloadAll()}
+            title="Download all photos as a zip for marketplace uploads"
+          >
+            {downloadingZip ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Download all
+          </Button>
+        )}
       </div>
       <div className="space-y-3">
         {images.length > 0 && (

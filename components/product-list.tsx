@@ -8,7 +8,8 @@ import { ReceiptService } from "@/lib/services/receipt.service"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, ExternalLink, Image as ImageIcon, Receipt as ReceiptIcon, TrendingUp, TrendingDown, History } from "lucide-react"
+import { Edit, Trash2, ExternalLink, Image as ImageIcon, Receipt as ReceiptIcon, TrendingUp, TrendingDown, History, Download } from "lucide-react"
+import { downloadProductPhotosZip } from "@/lib/api/storage-client"
 import {
   Table,
   TableBody,
@@ -124,6 +125,37 @@ export default function ProductList({
         description: error.message || "Failed to delete product",
         variant: "destructive",
       })
+    }
+  }
+
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  const handleDownloadPhotos = async (product: Product) => {
+    if (!product.id) return
+    const count = normalizeProductImages(product.images).length
+    if (count === 0) {
+      toast({
+        title: "No photos",
+        description: "Add photos to this product first.",
+        variant: "destructive",
+      })
+      return
+    }
+    setDownloadingId(product.id)
+    try {
+      await downloadProductPhotosZip(getToken, product.id)
+      toast({
+        title: "Photos downloaded",
+        description: `${count} photo${count === 1 ? "" : "s"} saved as a zip — ready for Gumtree / marketplace uploads.`,
+      })
+    } catch (error: unknown) {
+      toast({
+        title: "Download failed",
+        description: error instanceof Error ? error.message : "Could not download photos",
+        variant: "destructive",
+      })
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -314,6 +346,18 @@ export default function ProductList({
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                    {imageEntries.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDownloadPhotos(product)}
+                        disabled={downloadingId === product.id}
+                        className="h-8 w-8 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                        title="Download all photos (zip)"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -618,6 +662,18 @@ export default function ProductList({
                 <Edit className="mr-2 h-4 w-4" />
                 Details
               </Button>
+              {imageEntries.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownloadPhotos(product)}
+                  disabled={downloadingId === product.id}
+                  className="hover:bg-amber-50 hover:border-amber-300 dark:hover:bg-amber-900/20 dark:hover:border-amber-700 transition-all duration-200"
+                  title="Download all photos as zip for marketplace posts"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

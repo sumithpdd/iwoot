@@ -130,3 +130,50 @@ export async function deleteImageByUrl(imageUrl: string): Promise<void> {
   const bucket = getAdminBucket()
   await bucket.file(decodedPath).delete({ ignoreNotFound: true })
 }
+
+function extFromContentType(contentType: string | undefined, fallbackUrl: string): string {
+  const ct = (contentType || "").toLowerCase()
+  if (ct.includes("png")) return "png"
+  if (ct.includes("webp")) return "webp"
+  if (ct.includes("gif")) return "gif"
+  if (ct.includes("jpeg") || ct.includes("jpg")) return "jpg"
+  const path = fallbackUrl.split("?")[0] || ""
+  const m = path.match(/\.(png|jpe?g|webp|gif)$/i)
+  return m ? m[1].toLowerCase().replace("jpeg", "jpg") : "jpg"
+}
+
+/** Load image bytes from Storage (preferred) or HTTP for external URLs. */
+export async function downloadImageBuffer(
+  imageUrl: string,
+  userId: string
+): Promise<{ buffer: Buffer; contentType: string; ext: string }> {
+  try {
+    const path = storagePathFromDownloadUrl(imageUrl)
+    if (storagePathOwnedByUser(path, userId)) {
+      const bucket = getAdminBucket()
+      const file = bucket.file(path)
+      const [buffer] = await file.download()
+      const [meta] = await file.getMetadata()
+      const contentType = String(meta.contentType || "image/jpeg")
+      return {
+        buffer,
+        contentType,
+        ext: extFromContentType(contentType, imageUrl),
+      }
+    }
+  } catch {
+    // fall through to HTTP fetch (lookup / external URLs)
+  }
+
+  const res = await fetch(imageUrl)
+  if (!res.ok) {
+    throw new Error(`Failed to download image (${res.status})`)
+  }
+  const contentType = res.headers.get("content-type") || "image/jpeg"
+  const buffer = Buffer.from(await res.arrayBuffer())
+  return {
+    buffer,
+    contentType,
+    ext: extFromContentType(contentType, imageUrl),
+  }
+}
