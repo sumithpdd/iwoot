@@ -51,3 +51,5 @@ firebase-keys/
 *.tsbuildinfo
 next-env.d.ts
 .firebaserc
+
+.vercel
