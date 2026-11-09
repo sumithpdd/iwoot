@@ -1,76 +1,93 @@
 # IWOOT MCP (Claude, ChatGPT, Cursor)
 
-Expose inventory and sell-compare tools to external agents — same Streamable HTTP approach as SitecoreAiDemoSenario’s `/api/mcp`.
+Expose **I want** research and **I have** inventory / resale tools to external agents — same Streamable HTTP pattern as Customer Engagement Hub / Sitecore demos.
 
 ## Endpoint
 
 ```
-POST https://<your-host>/api/mcp
+POST https://iwoot.vercel.app/api/mcp
 ```
 
 Also accepts `DELETE` for session teardown. `GET` returns 405 (clients should use POST).
 
-Production example: `https://iwoot.vercel.app/api/mcp`
-
 ## Auth
 
-Set in `.env.local` / Vercel:
+**Preferred:** open **[MCP settings](/mcp)** while signed in → mint an `iwootmcp_…` token (shown once) → use as Bearer. The page uses `McpService` → `/api/mcp/tokens` (no raw fetch). Tokens are hashed in Firestore (`mcpAccessTokens`); revoke anytime from that page.
+
+**Legacy env (still supported):**
 
 ```
 IWOOT_MCP_TOKEN=<long-random-secret>
 IWOOT_MCP_USER_ID=<your-firebase-uid>
 ```
 
-Send either:
+Also accepted: Firebase ID token as Bearer (full read+write for that user).
 
-- `Authorization: Bearer <IWOOT_MCP_TOKEN>`
-- `x-api-key: <IWOOT_MCP_TOKEN>`
-- or a Firebase **ID token** as Bearer (scopes to that user)
+Send `Authorization: Bearer <token>` or `x-api-key`.
 
 ## Tools
+
+### Inventory & resale (have)
 
 | Tool | Purpose |
 |------|---------|
 | `list_inventory` | Want / have products |
 | `get_product` | One product by id |
-| `list_sell_compare_pages` | Compare page slugs |
-| `get_sell_compare` | Venue rows (Gumtree / CeX / Shpock) |
-| `draft_listing` | Draft title + body for a have item |
-| `record_live_listing` | After you post: save URL + £ ask, mark selling, update sell-compare |
-| `update_listing_status` | `not_listed` / `selling` / `sold` |
+| `list_sell_compare_pages` | Resale compare slugs |
+| `get_sell_compare` | Gumtree / CeX / Shpock rows |
+| `draft_listing` | Draft marketplace copy |
+| `record_live_listing` | Save live ad URL + £ ask |
+| `update_listing_status` | not_listed / selling / sold |
+| `update_have_disposition` | kept / selling / sold / gifted / recycled |
+| `append_product_notes` | Append notes |
 
-### `record_live_listing` (replaces one-off Admin scripts)
+### Buying research (want)
 
-Example prompt for Claude / ChatGPT:
+| Tool | Purpose |
+|------|---------|
+| `list_want_research` | Baskets + want products overview |
+| `get_want_details` | Full visits, benchmarks, plan |
+| `upsert_want_basket` | Multi-item shopping plan |
+| `upsert_want_product` | Create/update a want SKU |
+| `add_research_visit` | Store / online check |
+| `add_price_benchmark` | UK/US price row |
+| `add_research_link` | Attach URL |
+| `set_buying_plan_steps` | Buying checklist |
+| `update_buying_stage` | researching → … → bought |
+| `convert_want_to_have` | Mark purchased |
 
-> I posted my Sonos Move on Gumtree for £200 at  
-> https://www.gumtree.com/p/speakers/.../1803980797 — record that.
+## Example prompts (Claude / ChatGPT)
 
-Tool args:
+> What am I researching to buy right now?
 
-```json
-{
-  "query": "Sonos Move",
-  "platform": "Gumtree",
-  "url": "https://www.gumtree.com/...",
-  "priceGbp": 200,
-  "location": "Isle of Dogs"
-}
-```
+> Show details for my Orlando Apple basket — visits and UK prices.
 
-Infers sell-compare slug (`sonos-move`, `nebula-cosmos-max`, …) from the product name when `sellCompareSlug` is omitted.
+> I checked John Lewis: iPad Pro 13 1TB nano-texture still £2,199 — add that benchmark.
 
-## Claude / ChatGPT
+> I bought the 46 mm Watch for £419 at Apple UK — convert that want to have.
 
-1. Deploy the app with the env vars above (Production + Development).
-2. Add a custom MCP / connector pointing at `https://iwoot.vercel.app/api/mcp` with header `Authorization: Bearer <IWOOT_MCP_TOKEN>`.
-3. Ask things like:
-   - “What am I selling?”
-   - “Draft a Gumtree ad for Nebula”
-   - “I listed Nebula on Shpock for £1000 at &lt;url&gt; — record it”
+> Draft a Gumtree ad for my Sonos Move and record the live listing at &lt;url&gt; for £200.
 
-In-app Gemini chat (`/api/chat`) exposes the same write tools when you are signed in.
+## In-app Gemini
 
-## Local streaming UI
+Signed-in dashboard chat (`POST /api/chat`) uses the **same handlers** (`lib/server/ai/inventory-tool-handlers.ts`). Prefer tools when logging research so Claude/ChatGPT and the app share one Firestore truth (`products` + `wantBaskets`).
 
-The floating **IWOOT · Gemini** panel already calls `/api/chat` with your Firebase token and can list inventory, draft listings, and record live ads without MCP.
+## Code layout (no duplicates)
+
+| Concern | Module |
+|---------|--------|
+| Tool implementations | `lib/server/ai/inventory-tool-handlers.ts` |
+| Gemini wrapper | `lib/server/ai/inventory-tools.ts` |
+| MCP registration | `lib/server/mcp/iwoot-mcp-server.ts` |
+| Product fuzzy match | `lib/utils/match-owned-product.ts` |
+| Want research domain | `lib/server/resale/want-research.ts` |
+| Live listing write | `lib/server/resale/record-live-listing.ts` |
+| HTTP want baskets | `/api/want-baskets` + `WantBasketService` |
+| MCP token UI | `/mcp` + `McpService` |
+
+## Data model (short)
+
+- **`wantBaskets`** — multi-item plan (title, visits, benchmarks, plan steps); also CRUD via `/api/want-baskets`
+- **`products` type=want** — line items with `wantBasketId`, `buyingStage`, `researchVisits`, `priceBenchmarks`, `researchLinks`
+- **`products` type=have** — ownership + `listingStatus` / `disposition` + sell-compare live rows
+- **`mcpAccessTokens`** — hashed connector tokens (scopes `read` / `write`)

@@ -54,19 +54,22 @@ export async function POST(request: Request) {
       model: google(modelId),
       system: `You are the IWOOT assistant (I Want One Of Those / I Have One Of Those).
 
-App purpose: help the signed-in user track products they WANT or HAVE, record purchase prices, compare resale venues (Gumtree, CeX / webuy, Shpock), and draft listing copy.
+App purpose:
+- WANT: track products the user is researching (store visits, UK/US price benchmarks, links, buying plans, multi-item baskets).
+- HAVE: track owned items, sell on Gumtree/Shpock/eBay/CeX, mark sold/gifted/recycled.
 
 Rules:
-- Prefer tools (list_inventory, get_sell_compare, draft_listing) over inventing stock or prices.
-- Ownership answers must use USER INVENTORY / list_inventory. Never substitute Move 2 for original Sonos Move (S17), or invent a Nebula model they do not own.
-- Sell-compare pages are static UK reference grids, not live scrapes. Say so when quoting prices.
+- Prefer tools over inventing inventory or prices. Use list_want_research / get_want_details for buying research; list_inventory for ownership.
+- Never invent products they do not have. Never substitute Move 2 for original Sonos Move (S17).
+- When the user shares research (stores visited, Apple UK prices, buying plan), call upsert_want_basket / upsert_want_product / add_research_visit / add_price_benchmark / set_buying_plan_steps.
+- When they buy something, convert_want_to_have. When they list it, record_live_listing or draft_listing. When done with it, update_have_disposition (sold/gifted/recycled).
+- Sell-compare pages are UK resale reference grids, not live scrapes.
 - Keep answers practical and brief unless asked for detail.
-- When helping sell Sonos Move or Nebula Cosmos Max, point to /sell-compare/sonos-move and /sell-compare/nebula-cosmos-max.
 
 ${inventory}`,
       messages: modelMessages,
       tools,
-      stopWhen: stepCountIs(6),
+      stopWhen: stepCountIs(10),
     })
 
     return result.toUIMessageStreamResponse()

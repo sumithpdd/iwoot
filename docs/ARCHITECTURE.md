@@ -16,15 +16,26 @@ app/api/*               ← verify token, authorize, validate, audit
         ▼
 lib/server/repositories ← Admin SDK only (Firestore)
 lib/server/storage-admin
+lib/server/resale/*     ← domain logic (want research, live listings)
+lib/server/ai/*         ← shared chat/MCP tool handlers
 ```
 
 | Layer | Location | Allowed to do |
 | --- | --- | --- |
-| UI | `components/`, `app/**/page.tsx` with `"use client"` | Forms, lists, call services. No Admin SDK, no Firestore. |
+| UI | `components/`, `app/**/page.tsx` with `"use client"` | Forms, lists, call **services only**. No raw `fetch("/api/…")`, no Admin SDK, no Firestore. |
 | Client SDK | `lib/firebase/config.ts` | **Auth (and Analytics) only.** |
-| Services | `lib/services/*.service.ts` | `fetch` `/api/…` with `Authorization: Bearer`. |
-| API | `app/api/**/route.ts` | `runtime = "nodejs"`. Verify ID token. |
+| Services | `lib/services/*.service.ts` | `apiRequest` → `/api/…` with Bearer. One service per resource. |
+| API | `app/api/**/route.ts` | `runtime = "nodejs"`. Verify ID token (or MCP token). |
+| Domain | `lib/server/resale/`, `lib/server/ai/` | Shared business logic used by API + chat + MCP. |
 | Repositories | `lib/server/repositories/` | Admin Firestore. Never import from client components. |
+
+### Robust coding rules
+
+1. **Everything through API** — UI → `*Service` → Route Handler → repository / domain. Exceptions: public catalog lookups (`lib/catalog/*`), Storage upload helper that already posts to `/api/storage`.
+2. **No duplicate matchers** — product fuzzy match is `matchOwnedProduct` in `lib/utils/match-owned-product.ts` (chat, MCP, record-live-listing, want-research).
+3. **One tool surface** — `createInventoryToolHandlers` in `lib/server/ai/inventory-tool-handlers.ts`; thin wrappers in `inventory-tools.ts` (Gemini) and `iwoot-mcp-server.ts` (MCP).
+4. **Validators are authoritative** — Zod in dialogs is UX only; `lib/validators/*` on PATCH/POST is the gate (including `buyingStage`, `disposition`, research arrays).
+5. **Shared URL helpers** — `lib/utils/http-url.ts` only; do not copy `isValidUrl`.
 
 ## Data: inventory vs sell-compare reference
 
@@ -49,9 +60,10 @@ Lists stay readable without joins. Keep the string in sync when the user picks a
 
 **AI chat + MCP**
 
-- In-app Gemini (`POST /api/chat`): inventory context + tools (`list_inventory`, `get_sell_compare`, `draft_listing`).
-- MCP (`POST /api/mcp`): same tools for Claude / ChatGPT / Cursor. Auth: Firebase ID token or `IWOOT_MCP_TOKEN` + `IWOOT_MCP_USER_ID`. See `docs/MCP.md`.
-- Sell-compare is Firestore UK reference (Gumtree / CeX / Shpock). Primary pages: `/sell-compare/sonos-move`, `/sell-compare/nebula-cosmos-max`.
+- In-app Gemini (`POST /api/chat`): inventory context + tools from `createInventoryToolHandlers`.
+- MCP (`POST /api/mcp`): **same handlers**. Auth: minted `iwootmcp_…` (UI `/mcp` → `McpService`), Firebase ID token, or legacy env `IWOOT_MCP_TOKEN` + `IWOOT_MCP_USER_ID`. See `docs/MCP.md`.
+- Want baskets: Firestore `wantBaskets` + HTTP `/api/want-baskets` via `WantBasketService`.
+- Sell-compare: Firestore UK reference (Gumtree / CeX / Shpock). Primary pages: `/sell-compare/sonos-move`, `/sell-compare/nebula-cosmos-max`.
 
 ## React / Next.js conventions
 
@@ -87,9 +99,21 @@ Do not copy `isValidUrl` into each validator.
 - Committed `scripts/*.mjs` that hardcode UIDs, emails, or invoices.
 - A second product list in `lib/data` that mirrors Firestore.
 
+## Client services (must use)
+
+| Resource | Service | API |
+| --- | --- | --- |
+| Products | `ProductService` | `/api/products` |
+| Receipts | `ReceiptService` | `/api/receipts` |
+| Stores / brands | `StoreService` / `BrandService` | `/api/stores`, `/api/brands` |
+| Want baskets | `WantBasketService` | `/api/want-baskets` |
+| MCP tokens | `McpService` | `/api/mcp/tokens` |
+| Product AI assist | `AiProductAssistService` | `/api/ai/product-assist` |
+
 ## Related docs
 
 - `docs/DEVELOPER_GUIDE.md` — file map
 - `docs/QUICK_REFERENCE.md` — service call snippets
+- `docs/MCP.md` — Claude / ChatGPT connector
 - `docs/FIRESTORE_RULES.md` — rules
-- `docs/SELLING_AND_COMPARE.md` — static compare pages
+- `docs/SELLING_AND_COMPARE.md` — compare pages

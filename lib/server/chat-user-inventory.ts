@@ -1,6 +1,7 @@
 import { listProductsByUser } from "@/lib/server/repositories/products.repository"
 import { listStoresByUser } from "@/lib/server/repositories/stores.repository"
-import type { HaveProduct, Product } from "@/lib/types/product"
+import type { HaveProduct, Product, WantProduct } from "@/lib/types/product"
+import { listWantBasketsByUser } from "@/lib/server/repositories/want-baskets.repository"
 import { htmlToPlainText } from "@/lib/utils/html-plain-text"
 import { normalizeProductImages } from "@/lib/utils/product-images"
 import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
@@ -54,9 +55,15 @@ function formatProductLine(product: Product, storeName?: string): string {
     if (platforms.length) bits.push(`platforms=${platforms.join(", ")}`)
     if (have.soldAt) bits.push(`soldAt=${have.soldAt}`)
     if (have.soldWhere) bits.push(`soldWhere=${have.soldWhere}`)
-  } else if (product.currentPrice != null) {
-    bits.push(`currentPrice=${product.currentPrice}`)
-    if (product.targetPrice != null) bits.push(`targetPrice=${product.targetPrice}`)
+  } else {
+    const want = product as WantProduct
+    if (want.currentPrice != null) bits.push(`currentPrice=${want.currentPrice}`)
+    if (want.targetPrice != null) bits.push(`targetPrice=${want.targetPrice}`)
+    if (want.buyingStage) bits.push(`buyingStage=${want.buyingStage}`)
+    if (want.wantBasketId) bits.push(`basket=${want.wantBasketId}`)
+    if (want.researchVisits?.length) bits.push(`visits=${want.researchVisits.length}`)
+    if (want.priceBenchmarks?.length)
+      bits.push(`benchmarks=${want.priceBenchmarks.length}`)
   }
 
   const images = normalizeProductImages(product.images)
@@ -72,9 +79,10 @@ function formatProductLine(product: Product, storeName?: string): string {
 }
 
 export async function buildUserInventoryContext(userId: string): Promise<string> {
-  const [products, stores] = await Promise.all([
+  const [products, stores, baskets] = await Promise.all([
     listProductsByUser(userId),
     listStoresByUser(userId),
+    listWantBasketsByUser(userId),
   ])
 
   const storeById = new Map(
@@ -83,7 +91,7 @@ export async function buildUserInventoryContext(userId: string): Promise<string>
       .map((s) => [s.id as string, s.name])
   )
 
-  if (!products.length) {
+  if (!products.length && !baskets.length) {
     return `USER INVENTORY: empty. This signed-in user has no saved want/have products yet. Do not invent items they own.`
   }
 
@@ -91,9 +99,18 @@ export async function buildUserInventoryContext(userId: string): Promise<string>
   const want = products.filter((p) => p.type === "want")
 
   const lines: string[] = [
-    `USER INVENTORY (source of truth for this signed-in user). Answer ownership questions ONLY from this list. Do not list generic catalog models they do not own. Demo /sell-compare pages are static samples, not this user's products.`,
-    `Counts: ${have.length} have, ${want.length} want.`,
+    `USER INVENTORY (source of truth for this signed-in user). Answer ownership / research questions ONLY from this list. Do not invent items. Demo /sell-compare pages are static samples, not this user's products.`,
+    `Counts: ${have.length} have, ${want.length} want, ${baskets.length} want baskets.`,
   ]
+
+  if (baskets.length) {
+    lines.push("WANT BASKETS:")
+    for (const b of baskets) {
+      lines.push(
+        `- ${b.title} | id=${b.id} | stage=${b.buyingStage || "researching"} | targetTotalGbp=${b.targetTotalGbp ?? "n/a"} | visits=${b.researchVisits?.length ?? 0} | benchmarks=${b.priceBenchmarks?.length ?? 0} | planSteps=${b.buyingPlanSteps?.length ?? 0}`
+      )
+    }
+  }
 
   if (have.length) {
     lines.push("HAVE:")

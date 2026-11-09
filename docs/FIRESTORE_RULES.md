@@ -92,6 +92,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Want shopping baskets (UI → WantBasketService → /api/want-baskets → Admin SDK)
+    match /wantBaskets/{basketId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId)
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // MCP opaque tokens — Admin SDK only (never client)
+    match /mcpAccessTokens/{tokenId} {
+      allow read, write: if false;
+    }
+
     // Users Collection (for future use)
     match /users/{userId} {
       // Allow read if user is viewing their own data
@@ -103,6 +118,8 @@ service cloud.firestore {
   }
 }
 ```
+
+Prefer the repo file `firestore.rules` as the source of truth; deploy with `firebase deploy --only firestore:rules`.
 
 ### Step 3: Publish the Rules
 1. Click **Publish** button

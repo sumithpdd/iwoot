@@ -12,6 +12,7 @@ import type { HaveProduct, ListingStatus, Product } from "@/lib/types/product"
 import type { VenuePriceRow } from "@/lib/types/sell-compare"
 import { getListingPlatforms } from "@/lib/utils/product-listing"
 import { isAbsoluteUrl } from "@/lib/utils/http-url"
+import { matchOwnedProduct } from "@/lib/utils/match-owned-product"
 
 export const LIVE_LISTING_PLATFORMS = [
   "Gumtree",
@@ -22,19 +23,6 @@ export const LIVE_LISTING_PLATFORMS = [
 ] as const
 
 export type LiveListingPlatform = (typeof LIVE_LISTING_PLATFORMS)[number]
-
-function matchProduct(products: Product[], query: string): Product | undefined {
-  const q = query.trim().toLowerCase()
-  if (!q) return undefined
-  return (
-    products.find((p) => p.id === query.trim()) ||
-    products.find((p) => {
-      const hay =
-        `${p.name} ${p.brand} ${p.model || ""} ${p.sku || ""}`.toLowerCase()
-      return hay.includes(q) || q.split(/\s+/).every((t) => hay.includes(t))
-    })
-  )
-}
 
 function platformVenueId(platform: LiveListingPlatform): string {
   const key = platform.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
@@ -90,7 +78,7 @@ export async function recordLiveListing(
   }
 
   const products = await listProductsByUser(uid, "have")
-  const product = matchProduct(products, input.query)
+  const product = matchOwnedProduct(products, input.query)
   if (!product || product.type !== "have") {
     return { ok: false, error: "No matching have product in inventory" }
   }
@@ -190,7 +178,7 @@ export async function updateProductListingStatus(
   | { ok: false; error: string }
 > {
   const products = await listProductsByUser(uid, "have")
-  const product = matchProduct(products, input.query)
+  const product = matchOwnedProduct(products, input.query)
   if (!product || product.type !== "have") {
     return { ok: false, error: "No matching have product in inventory" }
   }

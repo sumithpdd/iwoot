@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import { AiProductAssistService } from "@/lib/services/ai-product-assist.service"
 import type { ProductType } from "@/lib/types/product"
 
 type Props<T extends FieldValues> = {
@@ -41,34 +42,15 @@ export function AiProductFieldAssist<T extends FieldValues>({
     if (!user || !prompt.trim()) return
     setBusy(true)
     try {
-      const token = await user.getIdToken()
-      const res = await fetch("/api/ai/product-assist", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const { fields } = await AiProductAssistService.suggestFields(
+        () => user.getIdToken(),
+        {
           prompt: prompt.trim(),
           field: fieldKey,
           productType,
-          currentValues: getFormValues(),
-        }),
-      })
-      const text = await res.text()
-      if (!res.ok) {
-        try {
-          const j = JSON.parse(text) as { error?: string }
-          throw new Error(j.error || text)
-        } catch (e) {
-          if (e instanceof Error && e.message !== "Unexpected end of JSON input") throw e
-          throw new Error(text || res.statusText)
+          currentValues: getFormValues() as Record<string, unknown>,
         }
-      }
-      const data = JSON.parse(text) as {
-        fields?: Record<string, unknown>
-      }
-      const fields = data.fields ?? {}
+      )
       let applied = 0
       for (const [key, val] of Object.entries(fields)) {
         if (val === undefined || val === null) continue

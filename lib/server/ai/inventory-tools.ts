@@ -1,59 +1,23 @@
 import { tool } from "ai"
 import { z } from "zod"
-import { listProductsByUser } from "@/lib/server/repositories/products.repository"
-import { getProductById } from "@/lib/server/repositories/products.repository"
-import {
-  getSellComparePageBySlug,
-  listSellComparePages,
-} from "@/lib/server/repositories/sell-compare.repository"
 import {
   LIVE_LISTING_PLATFORMS,
-  recordLiveListing,
-  updateProductListingStatus,
-} from "@/lib/server/resale/record-live-listing"
-import type { HaveProduct, Product } from "@/lib/types/product"
-import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
-import { htmlToPlainText } from "@/lib/utils/html-plain-text"
+  createInventoryToolHandlers,
+} from "@/lib/server/ai/inventory-tool-handlers"
 
-function productSummary(p: Product) {
-  const base = {
-    id: p.id,
-    type: p.type,
-    name: p.name,
-    brand: p.brand,
-    model: p.model ?? null,
-    sku: p.sku ?? null,
-    originalPrice: p.originalPrice,
-    date: p.date,
-  }
-  if (p.type === "have") {
-    const h = p as HaveProduct
-    return {
-      ...base,
-      priceBought: h.priceBought,
-      listingStatus: getListingStatus(h),
-      listingPlatforms: getListingPlatforms(h),
-      condition: h.condition ?? null,
-      purchaseLocation: h.purchaseLocation ?? null,
-    }
-  }
-  return {
-    ...base,
-    currentPrice: p.currentPrice ?? null,
-    targetPrice: p.targetPrice ?? null,
-  }
-}
+const BUYING_STAGE_ENUM = [
+  "researching",
+  "shortlisted",
+  "ready_to_buy",
+  "ordered",
+  "bought",
+  "cancelled",
+] as const
 
-function matchProduct(products: Product[], query: string): Product | undefined {
-  const q = query.trim().toLowerCase()
-  if (!q) return undefined
-  return products.find((p) => {
-    const hay = `${p.name} ${p.brand} ${p.model || ""} ${p.sku || ""} ${p.id}`.toLowerCase()
-    return hay.includes(q) || q.split(/\s+/).every((t) => hay.includes(t))
-  })
-}
-
+/** Gemini chat tools — thin Zod/AI SDK wrappers over shared handlers. */
 export function buildInventoryChatTools(uid: string) {
+  const h = createInventoryToolHandlers(uid)
+
   return {
     list_inventory: tool({
       description:
@@ -61,52 +25,28 @@ export function buildInventoryChatTools(uid: string) {
       inputSchema: z.object({
         type: z.enum(["all", "want", "have"]).default("all"),
       }),
-      execute: async ({ type }) => {
-        const products = await listProductsByUser(
-          uid,
-          type === "all" ? undefined : type
-        )
-        return {
-          count: products.length,
-          products: products.map(productSummary),
-        }
-      },
+      execute: async (args) => h.list_inventory(args),
+    }),
+
+    get_product: tool({
+      description: "Fetch one product by Firestore document id (must belong to the user).",
+      inputSchema: z.object({ productId: z.string() }),
+      execute: async (args) => h.get_product(args),
     }),
 
     get_sell_compare: tool({
       description:
         "Load UK sell-compare venue rows from Firestore (Gumtree, CeX, Shpock, etc.) for a page slug.",
       inputSchema: z.object({
-        slug: z
-          .string()
-          .describe("Sell-compare page slug, e.g. sonos-move"),
+        slug: z.string().describe("Sell-compare page slug, e.g. sonos-move"),
       }),
-      execute: async ({ slug }) => {
-        const entry = await getSellComparePageBySlug(slug)
-        if (!entry) return { error: "Unknown slug" }
-        return {
-          title: entry.title,
-          path: entry.path,
-          blurb: entry.blurb,
-          venues: entry.venues,
-        }
-      },
+      execute: async (args) => h.get_sell_compare(args),
     }),
 
     list_sell_compare_pages: tool({
       description: "List published sell-compare pages from Firestore.",
       inputSchema: z.object({}),
-      execute: async () => {
-        const pages = await listSellComparePages({ publishedOnly: true })
-        return {
-          pages: pages.map((e) => ({
-            slug: e.slug,
-            path: e.path,
-            title: e.title,
-            blurb: e.blurb,
-          })),
-        }
-      },
+      execute: async () => h.list_sell_compare_pages(),
     }),
 
     draft_listing: tool({
@@ -116,89 +56,212 @@ export function buildInventoryChatTools(uid: string) {
         query: z
           .string()
           .describe("Product name, brand, model, sku, or Firestore id"),
-        platform: z
-          .enum(["Gumtree", "Shpock", "CeX (we buy)", "Facebook Marketplace", "eBay"])
-          .default("Gumtree"),
+        platform: z.enum(LIVE_LISTING_PLATFORMS).default("Gumtree"),
       }),
-      execute: async ({ query, platform }) => {
-        const products = await listProductsByUser(uid, "have")
-        const product =
-          products.find((p) => p.id === query.trim()) || matchProduct(products, query)
-        if (!product || product.type !== "have") {
-          return { error: "No matching have product in inventory" }
-        }
-        const h = product as HaveProduct
-        const condition = h.condition || "Good"
-        const desc = htmlToPlainText(h.description || "").slice(0, 400)
-        const title = `${product.brand} ${product.name}${product.model ? ` (${product.model})` : ""} — ${condition}`
-        const body = [
-          `${product.brand} ${product.name}${product.model ? `, model ${product.model}` : ""}${product.sku ? `, SKU ${product.sku}` : ""}.`,
-          `Condition: ${condition}.`,
-          h.purchaseLocation ? `Bought from: ${h.purchaseLocation}.` : null,
-          `Paid £${h.priceBought.toFixed(2)} (tracker). Asking price for ${platform} — check sell-compare before posting.`,
-          desc || null,
-          "Collection or postage as agreed. Happy to demo if local.",
-        ]
-          .filter(Boolean)
-          .join("\n\n")
-        return {
-          productId: product.id,
-          platform,
-          title,
-          body,
-          tip: "Open /sell-compare for venue price ranges before you set an asking price.",
-        }
-      },
-    }),
-
-    get_product: tool({
-      description: "Fetch one product by Firestore document id (must belong to the user).",
-      inputSchema: z.object({ productId: z.string() }),
-      execute: async ({ productId }) => {
-        const product = await getProductById(productId)
-        if (!product || product.userId !== uid) {
-          return { error: "Product not found" }
-        }
-        return productSummary(product)
-      },
+      execute: async (args) => h.draft_listing(args),
     }),
 
     record_live_listing: tool({
       description:
         "Record that the user posted a live marketplace ad (Gumtree, Shpock, …): mark the have product as selling, save the URL/price in notes, and add a “Your live listing” row on the matching sell-compare page.",
       inputSchema: z.object({
-        query: z
-          .string()
-          .describe("Product name, brand, model, sku, or Firestore id"),
+        query: z.string(),
         platform: z.enum(LIVE_LISTING_PLATFORMS),
-        url: z.string().url().describe("Live ad URL"),
-        priceGbp: z.number().nonnegative().describe("Asking price in GBP"),
-        sellCompareSlug: z
-          .string()
-          .optional()
-          .describe(
-            "Optional sell-compare slug (e.g. sonos-move). Inferred from product name when omitted."
-          ),
-        location: z.string().optional().describe("e.g. Isle of Dogs"),
+        url: z.string().url(),
+        priceGbp: z.number().nonnegative(),
+        sellCompareSlug: z.string().optional(),
+        location: z.string().optional(),
         notes: z.string().optional(),
-        setWebsite: z
-          .boolean()
-          .optional()
-          .describe("Set product.website to the ad URL (default true)"),
+        setWebsite: z.boolean().optional(),
       }),
-      execute: async (args) => recordLiveListing(uid, args),
+      execute: async (args) => h.record_live_listing(args),
     }),
 
     update_listing_status: tool({
       description:
         "Set a have product listingStatus to not_listed, selling, or sold (optional soldWhere / soldAt).",
       inputSchema: z.object({
-        query: z.string().describe("Product name or id"),
+        query: z.string(),
         listingStatus: z.enum(["not_listed", "selling", "sold"]),
         soldWhere: z.string().optional(),
-        soldAt: z.string().optional().describe("ISO date YYYY-MM-DD"),
+        soldAt: z.string().optional(),
       }),
-      execute: async (args) => updateProductListingStatus(uid, args),
+      execute: async (args) => h.update_listing_status(args),
+    }),
+
+    list_want_research: tool({
+      description:
+        "Overview of want baskets and want products with research/visit/benchmark counts.",
+      inputSchema: z.object({}),
+      execute: async () => h.list_want_research(),
+    }),
+
+    get_want_details: tool({
+      description:
+        "Full want product or basket including research visits, UK price benchmarks, links, and buying plan steps.",
+      inputSchema: z.object({ query: z.string() }),
+      execute: async (args) => h.get_want_details(args),
+    }),
+
+    upsert_want_basket: tool({
+      description:
+        "Create or update a multi-item want shopping plan (e.g. iPad + watches + keyboard).",
+      inputSchema: z.object({
+        basketId: z.string().optional(),
+        title: z.string(),
+        blurb: z.string().optional(),
+        buyingStage: z.enum(BUYING_STAGE_ENUM).optional(),
+        targetTotalGbp: z.number().nullable().optional(),
+        currencyNote: z.string().optional(),
+        researchSummary: z.string().optional(),
+      }),
+      execute: async (args) => h.upsert_want_basket(args),
+    }),
+
+    upsert_want_product: tool({
+      description:
+        "Create or update an “I want” product (specs, target price, basket link, research summary).",
+      inputSchema: z.object({
+        productId: z.string().optional(),
+        name: z.string(),
+        brand: z.string(),
+        website: z.string().url(),
+        originalPrice: z.number().positive(),
+        targetPrice: z.number().positive().optional(),
+        currentPrice: z.number().positive().optional(),
+        model: z.string().optional(),
+        sku: z.string().optional(),
+        color: z.string().optional(),
+        size: z.string().optional(),
+        category: z.string().optional(),
+        notes: z.string().optional(),
+        researchSummary: z.string().optional(),
+        buyingStage: z.enum(BUYING_STAGE_ENUM).optional(),
+        wantBasketId: z.string().nullable().optional(),
+        specifications: z.record(z.string(), z.string()).optional(),
+      }),
+      execute: async (args) => h.upsert_want_product(args),
+    }),
+
+    add_research_visit: tool({
+      description:
+        "Log a store visit or online check against a want product or basket.",
+      inputSchema: z.object({
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        place: z.string(),
+        kind: z
+          .enum([
+            "visited_store",
+            "checked_online",
+            "tried_on",
+            "spoke_to_staff",
+            "other",
+          ])
+          .optional(),
+        checkedAt: z.string().optional(),
+        whatFound: z.string(),
+        url: z.string().url().optional(),
+        priceLocal: z.number().optional(),
+        currency: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+      execute: async (args) => h.add_research_visit(args),
+    }),
+
+    add_price_benchmark: tool({
+      description: "Add a UK/US price benchmark for a want item.",
+      inputSchema: z.object({
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        itemLabel: z.string(),
+        venue: z.string(),
+        priceGbp: z.number().nullable().optional(),
+        priceLocal: z.number().nullable().optional(),
+        currency: z.string().optional(),
+        url: z.string().url().optional(),
+        specification: z.string().optional(),
+        notes: z.string().optional(),
+        lastCheckedIso: z.string().optional(),
+      }),
+      execute: async (args) => h.add_price_benchmark(args),
+    }),
+
+    add_research_link: tool({
+      description: "Attach a research URL to a want product or basket.",
+      inputSchema: z.object({
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        label: z.string(),
+        url: z.string().url(),
+        notes: z.string().optional(),
+      }),
+      execute: async (args) => h.add_research_link(args),
+    }),
+
+    set_buying_plan_steps: tool({
+      description: "Replace the buying plan checklist on a want basket or product.",
+      inputSchema: z.object({
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        steps: z.array(
+          z.object({
+            title: z.string(),
+            detail: z.string().optional(),
+            done: z.boolean().optional(),
+            links: z
+              .array(z.object({ label: z.string(), url: z.string().url() }))
+              .optional(),
+          })
+        ),
+      }),
+      execute: async (args) => h.set_buying_plan_steps(args),
+    }),
+
+    update_buying_stage: tool({
+      description:
+        "Set buyingStage: researching | shortlisted | ready_to_buy | ordered | bought | cancelled.",
+      inputSchema: z.object({
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        buyingStage: z.enum(BUYING_STAGE_ENUM),
+      }),
+      execute: async (args) => h.update_buying_stage(args),
+    }),
+
+    convert_want_to_have: tool({
+      description:
+        "Mark a want product as purchased (type → have) with priceBought; keeps research history.",
+      inputSchema: z.object({
+        query: z.string(),
+        priceBought: z.number().positive(),
+        purchaseLocation: z.string().optional(),
+        storeId: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+      execute: async (args) => h.convert_want_to_have(args),
+    }),
+
+    update_have_disposition: tool({
+      description:
+        "Set end state for a have item: kept | selling | sold | gifted | recycled.",
+      inputSchema: z.object({
+        query: z.string(),
+        disposition: z.enum(["kept", "selling", "sold", "gifted", "recycled"]),
+        soldWhere: z.string().optional(),
+        soldAt: z.string().optional(),
+      }),
+      execute: async (args) => h.update_have_disposition(args),
+    }),
+
+    append_product_notes: tool({
+      description: "Append research or listing notes to a want or have product.",
+      inputSchema: z.object({
+        query: z.string(),
+        notes: z.string(),
+        type: z.enum(["want", "have", "all"]).optional(),
+      }),
+      execute: async (args) => h.append_product_notes(args),
     }),
   }
 }

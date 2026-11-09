@@ -300,6 +300,11 @@ export default function DashboardPage() {
                   Sell compare
                 </Button>
               </Link>
+              <Link href="/mcp">
+                <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-700">
+                  MCP
+                </Button>
+              </Link>
               <Link href="/admin">
                 <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-700">
                   <Settings className="mr-2 h-4 w-4" />

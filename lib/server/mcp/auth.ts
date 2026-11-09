@@ -1,5 +1,9 @@
 import { timingSafeEqual } from "node:crypto"
 import { getUidFromRequest } from "@/lib/server/require-auth"
+import {
+  resolveMcpAccessToken,
+  type McpTokenScope,
+} from "@/lib/server/mcp/access-tokens"
 
 function sameToken(provided: string, expected: string): boolean {
   const left = Buffer.from(provided)
@@ -22,13 +26,14 @@ function credential(request: Request): string {
   return presentedToken(request.headers.get("authorization") ?? "")
 }
 
-export type McpAuthOk = { uid: string }
+export type McpAuthOk = { uid: string; scopes: McpTokenScope[] }
 export type McpAuthFail = { response: Response }
 
 /**
  * Resolve the user for MCP:
- * 1) Firebase ID token (Authorization: Bearer <idToken>) → that uid
- * 2) Shared IWOOT_MCP_TOKEN + IWOOT_MCP_USER_ID (for Claude / ChatGPT connectors)
+ * 1) Shared IWOOT_MCP_TOKEN + IWOOT_MCP_USER_ID (legacy env connector)
+ * 2) Opaque iwootmcp_… token from Firestore mcpAccessTokens
+ * 3) Firebase ID token → that uid (full read+write)
  */
 export async function authorizeIwootMcp(
   request: Request
@@ -46,7 +51,25 @@ export async function authorizeIwootMcp(
   const shared = process.env.IWOOT_MCP_TOKEN?.trim()
   const sharedUid = process.env.IWOOT_MCP_USER_ID?.trim()
   if (shared && sharedUid && sameToken(provided, shared)) {
-    return { uid: sharedUid }
+    return { uid: sharedUid, scopes: ["read", "write"] }
+  }
+
+  if (provided.startsWith("iwootmcp_")) {
+    try {
+      const resolved = await resolveMcpAccessToken(provided)
+      if (resolved?.uid) {
+        return { uid: resolved.uid, scopes: resolved.scopes }
+      }
+    } catch (e) {
+      return {
+        response: Response.json(
+          {
+            error: e instanceof Error ? e.message : "Invalid MCP access token",
+          },
+          { status: 401 }
+        ),
+      }
+    }
   }
 
   const uid = await getUidFromRequest(
@@ -54,9 +77,12 @@ export async function authorizeIwootMcp(
       headers: { Authorization: `Bearer ${provided}` },
     })
   )
-  if (uid) return { uid }
+  if (uid) return { uid, scopes: ["read", "write"] }
 
   return {
-    response: Response.json({ error: "Invalid API key or Firebase token" }, { status: 401 }),
+    response: Response.json(
+      { error: "Invalid API key or Firebase token" },
+      { status: 401 }
+    ),
   }
 }

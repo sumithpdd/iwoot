@@ -48,6 +48,35 @@ await ProductService.deleteProduct(getToken, productId)
 
 Product validation for long HTML and spec maps: `lib/validators/product.validator.ts` (`validateDescriptionAndSpecs`).
 
+## Want baskets (client)
+
+```typescript
+import { WantBasketService } from "@/lib/services/want-basket.service"
+
+const baskets = await WantBasketService.list(getToken)
+const id = await WantBasketService.create(getToken, {
+  title: "Orlando Apple trip",
+  buyingStage: "researching",
+})
+await WantBasketService.update(getToken, id, { buyingStage: "shortlisted" })
+```
+
+## MCP tokens (client)
+
+```typescript
+import { McpService } from "@/lib/services/mcp.service"
+
+const tokens = await McpService.listTokens(getToken)
+const minted = await McpService.mintToken(getToken, {
+  label: "claude-desktop",
+  scopes: ["read", "write"],
+})
+// minted.token shown once; store offline
+await McpService.revokeToken(getToken, minted.tokenId)
+```
+
+Settings UI: `/mcp`. Connector docs: `docs/MCP.md`.
+
 ## Sell compare (Firestore)
 
 - **Hub**: `/sell-compare`

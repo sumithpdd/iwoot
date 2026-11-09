@@ -483,14 +483,18 @@ import { useToast } from "@/hooks/use-toast"
 
 ### Common data operations
 
-Use **API routes + services**, not the Firestore client SDK from React:
+Use **API routes + services**, not the Firestore client SDK from React — and avoid raw `fetch("/api/…")` in UI:
 
 ```typescript
 await ProductService.getProducts(getToken)
 await ProductService.createProduct(getToken, data)
+await WantBasketService.list(getToken)
+await McpService.listTokens(getToken)
 ```
 
-Server-only Admin examples live in `lib/server/repositories/` (never import those from client components).
+Shared AI/MCP tools live in `lib/server/ai/inventory-tool-handlers.ts` (one implementation). Product fuzzy match: `lib/utils/match-owned-product.ts`.
+
+Server-only Admin examples live in `lib/server/repositories/` (never import those from client components). See `docs/ARCHITECTURE.md` for the full layering checklist.
 
 ### Common React Patterns
 

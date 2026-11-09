@@ -30,6 +30,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import ImageUpload from "@/components/image-upload"
+import { WantResearchPanel } from "@/components/want-research-panel"
+import type { WantProduct as WantProductType } from "@/lib/types/product"
 import { WebsiteLinkPreview } from "@/components/website-link-preview"
 import StoreDialog, { type StoreDialogProps } from "@/components/store-dialog"
 import BrandDialog from "@/components/brand-dialog"
@@ -964,6 +966,10 @@ export default function ProductDialog({
           allowReorder
         />
       </div>
+
+      {type === "want" && product?.type === "want" && (
+        <WantResearchPanel product={product as WantProductType} />
+      )}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">

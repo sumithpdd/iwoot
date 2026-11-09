@@ -72,6 +72,12 @@ const PRODUCT_NULL_DELETES = new Set([
   "sellingOn",
   "soldAt",
   "soldWhere",
+  "wantBasketId",
+  "targetPrice",
+  "currentPrice",
+  "researchSummary",
+  "buyingStage",
+  "disposition",
 ])
 
 export async function updateProductDoc(

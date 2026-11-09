@@ -1,43 +1,58 @@
 ---
 name: iwoot-resale-mcp
-description: IWOOT inventory tracking, sell-compare (Gumtree/CeX/Shpock), Gemini chat tools, and MCP for Claude/ChatGPT. Use when selling Sonos Move or Nebula, drafting listings, wiring MCP, or explaining the app purpose.
+description: IWOOT inventory tracking, want research (baskets/visits/benchmarks), sell-compare (Gumtree/CeX/Shpock), Gemini chat tools, and MCP for Claude/ChatGPT. Use when buying research, selling Sonos/Nebula, drafting listings, or wiring MCP.
 ---
 
-# IWOOT resale + MCP
+# IWOOT — I want / I have + MCP
 
 ## App purpose
 
-Personal tracker for products you **want** or **have**: purchase prices, receipts, listing status, and UK **sell-compare** grids for Gumtree, CeX (webuy), and Shpock.
+Personal tracker for products you **want** (research, store visits, UK/US price benchmarks, buying plans) and **have** (purchase prices, receipts, listing status, resale).
 
-## Sell-compare (Firestore)
+## Want research (Firestore)
 
-| Item | Path | Data |
-|------|------|------|
-| Hub | `/sell-compare` | `listSellComparePages()` |
-| Page | `/sell-compare/[slug]` | `getSellComparePageBySlug(slug)` |
-| Collection | — | `sellComparePages/{slug}` with embedded `venues[]` |
-| Types | — | `lib/types/sell-compare.ts` |
-| Repo | — | `lib/server/repositories/sell-compare.repository.ts` |
+| Collection | Role |
+|------------|------|
+| `wantBaskets/{id}` | Multi-item plan (e.g. iPad + watches + keyboard) |
+| `products` `type=want` | Line items; `wantBasketId`, `buyingStage`, `researchVisits[]`, `priceBenchmarks[]`, `researchLinks[]`, `buyingPlanSteps[]` |
 
-Do not confuse **Move** (S17) with **Move 2**. Inventory is user-scoped products; sell-compare is shared reference docs. Never put venue prices in `lib/data/`.
+Types: `lib/types/want-research.ts`, `lib/types/want-basket.ts`. Logic: `lib/server/resale/want-research.ts`.
 
-Bulk seed / one-off patches: `.local-admin/` (skill `iwoot-local-admin`). Day-to-day live ads: MCP / chat tool `record_live_listing`.
+HTTP (UI must use service): `WantBasketService` → `/api/want-baskets`.
+
+Lifecycle: `researching` → `shortlisted` → `ready_to_buy` → `ordered` → `bought` (`convert_want_to_have`) → have disposition `kept` / `selling` / `sold` / `gifted` / `recycled`.
+
+## Sell-compare (have / resale)
+
+| Path | Data |
+|------|------|
+| `/sell-compare/[slug]` | `sellComparePages/{slug}` venues |
+| Repo | `lib/server/repositories/sell-compare.repository.ts` |
+
+## Shared AI tools (do not fork)
+
+| Module | Role |
+|--------|------|
+| `lib/server/ai/inventory-tool-handlers.ts` | Single implementation for chat + MCP |
+| `lib/server/ai/inventory-tools.ts` | Gemini binding |
+| `lib/server/mcp/iwoot-mcp-server.ts` | MCP binding |
+| `lib/utils/match-owned-product.ts` | Fuzzy product match |
 
 ## Gemini in-app chat
 
-- `POST /api/chat` — tools: `list_inventory`, `get_sell_compare`, `draft_listing`, `record_live_listing`, `update_listing_status`, …
-- UI: `components/ai-chat-panel.tsx` (quick prompts for Sonos / Nebula sell help)
+- `POST /api/chat` — full tool set (want + have)
+- UI: `components/ai-chat-panel.tsx`
 
 ## MCP (Claude / ChatGPT / Cursor)
 
-- Endpoint: `POST /api/mcp` (Streamable HTTP)
-- Auth: Firebase ID token **or** `IWOOT_MCP_TOKEN` + `IWOOT_MCP_USER_ID` in env
-- Tools: `list_inventory`, `get_product`, `list_sell_compare_pages`, `get_sell_compare`, `draft_listing`, **`record_live_listing`**, **`update_listing_status`**
+- UI: `/mcp` via `McpService` → `/api/mcp/tokens`
+- `POST /api/mcp` — Streamable HTTP
+- Auth: minted token, Firebase ID token, **or** legacy `IWOOT_MCP_TOKEN` + `IWOOT_MCP_USER_ID`
+- Tools: see `docs/MCP.md`
 
-Example: “I posted Sonos Move on Gumtree for £200 at &lt;url&gt; — record it.”
+Example: “What am I researching?” / “Add Best Buy visit…” / “Record Gumtree listing…”
 
-Connector URL: `https://<host>/api/mcp` with header `Authorization: Bearer <IWOOT_MCP_TOKEN>`. See `docs/MCP.md`.
+## Listing fields (have)
 
-## Listing fields
-
-Have products: `listingStatus` = `selling`, `listingPlatforms` includes Gumtree / CeX / Shpock. Prefer `record_live_listing` from MCP/chat over committed Admin scripts.
+`listingStatus` + `listingPlatforms`; prefer `record_live_listing` from MCP/chat. One-off Admin: `.local-admin/` only.
+Architecture rules: skill `iwoot-architecture`.

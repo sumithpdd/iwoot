@@ -47,7 +47,10 @@ async function handle(request: Request): Promise<Response> {
   const auth = await authorizeIwootMcp(request)
   if ("response" in auth) return withCors(auth.response)
 
-  const server = createIwootMcpServer(auth.uid)
+  const server = createIwootMcpServer(auth.uid, {
+    read: auth.scopes.includes("read") || auth.scopes.includes("write"),
+    write: auth.scopes.includes("write"),
+  })
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

@@ -9,8 +9,37 @@ import { Product, WantProduct, HaveProduct } from "@/lib/types/product"
 import { normalizeProductImages } from "@/lib/utils/product-images"
 import { isAbsoluteUrl, isCatalogOrHttpAsset } from "@/lib/utils/http-url"
 import type { ValidationResult } from "@/lib/validators/result"
+import type {
+  BuyingStage,
+  HaveDisposition,
+} from "@/lib/types/want-research"
 
 export type { ValidationResult }
+
+const BUYING_STAGES = new Set<BuyingStage>([
+  "researching",
+  "shortlisted",
+  "ready_to_buy",
+  "ordered",
+  "bought",
+  "cancelled",
+])
+
+const HAVE_DISPOSITIONS = new Set<HaveDisposition>([
+  "kept",
+  "selling",
+  "sold",
+  "gifted",
+  "recycled",
+])
+
+const RESEARCH_VISIT_KINDS = new Set([
+  "visited_store",
+  "checked_online",
+  "tried_on",
+  "spoke_to_staff",
+  "other",
+])
 
 /**
  * Validate a product before creation
@@ -54,6 +83,7 @@ export function validateProduct(
     if (wantProduct.targetPrice && wantProduct.targetPrice <= 0) {
       errors.push("Target price must be greater than 0")
     }
+    validateWantResearchFields(wantProduct, errors)
   } else if (product.type === "have") {
     const haveProduct = product as HaveProduct
     if (!haveProduct.priceBought || haveProduct.priceBought <= 0) {
@@ -68,6 +98,8 @@ export function validateProduct(
       },
       errors
     )
+    validateHaveDisposition(haveProduct.disposition, errors)
+    validateSharedResearchArrays(haveProduct, errors)
   }
 
   // Image validation (supports legacy string[] and { url, tags }[])
@@ -182,6 +214,25 @@ export function validateProductUpdate(
     )
   }
 
+  if ("disposition" in updates) {
+    validateHaveDisposition(
+      (updates as Partial<HaveProduct>).disposition,
+      errors
+    )
+  }
+
+  if (
+    "buyingStage" in updates ||
+    "wantBasketId" in updates ||
+    "researchSummary" in updates ||
+    "researchVisits" in updates ||
+    "priceBenchmarks" in updates ||
+    "researchLinks" in updates ||
+    "buyingPlanSteps" in updates
+  ) {
+    validateWantResearchFields(updates as Partial<WantProduct>, errors)
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -189,6 +240,186 @@ export function validateProductUpdate(
 }
 
 const LISTING_STATUSES = new Set(["not_listed", "selling", "sold"])
+const MAX_RESEARCH_SUMMARY = 50_000
+const MAX_RESEARCH_LIST = 100
+
+function validateHaveDisposition(
+  disposition: unknown,
+  errors: string[]
+) {
+  if (disposition === undefined || disposition === null) return
+  if (
+    typeof disposition !== "string" ||
+    !HAVE_DISPOSITIONS.has(disposition as HaveDisposition)
+  ) {
+    errors.push(
+      "disposition must be kept, selling, sold, gifted, or recycled"
+    )
+  }
+}
+
+function validateWantResearchFields(
+  payload: Partial<WantProduct>,
+  errors: string[]
+) {
+  if (payload.buyingStage !== undefined && payload.buyingStage !== null) {
+    if (
+      typeof payload.buyingStage !== "string" ||
+      !BUYING_STAGES.has(payload.buyingStage)
+    ) {
+      errors.push(
+        "buyingStage must be researching, shortlisted, ready_to_buy, ordered, bought, or cancelled"
+      )
+    }
+  }
+  if (payload.wantBasketId !== undefined && payload.wantBasketId !== null) {
+    if (
+      typeof payload.wantBasketId !== "string" ||
+      payload.wantBasketId.trim().length === 0
+    ) {
+      errors.push("wantBasketId must be a non-empty string or null")
+    } else if (payload.wantBasketId.length > 128) {
+      errors.push("wantBasketId is too long (max 128 characters)")
+    }
+  }
+  validateSharedResearchArrays(payload, errors)
+}
+
+function validateSharedResearchArrays(
+  payload: {
+    researchSummary?: unknown
+    researchVisits?: unknown
+    priceBenchmarks?: unknown
+    researchLinks?: unknown
+    buyingPlanSteps?: unknown
+  },
+  errors: string[]
+) {
+  if (payload.researchSummary !== undefined && payload.researchSummary !== null) {
+    if (typeof payload.researchSummary !== "string") {
+      errors.push("researchSummary must be a string")
+    } else if (payload.researchSummary.length > MAX_RESEARCH_SUMMARY) {
+      errors.push(
+        `researchSummary is too long (max ${MAX_RESEARCH_SUMMARY} characters)`
+      )
+    }
+  }
+
+  if (payload.researchVisits !== undefined && payload.researchVisits !== null) {
+    if (!Array.isArray(payload.researchVisits)) {
+      errors.push("researchVisits must be an array")
+    } else if (payload.researchVisits.length > MAX_RESEARCH_LIST) {
+      errors.push(`Too many researchVisits (max ${MAX_RESEARCH_LIST})`)
+    } else {
+      payload.researchVisits.forEach((v, i) => {
+        if (!v || typeof v !== "object") {
+          errors.push(`researchVisits[${i}] must be an object`)
+          return
+        }
+        const row = v as Record<string, unknown>
+        if (typeof row.place !== "string" || !row.place.trim()) {
+          errors.push(`researchVisits[${i}].place is required`)
+        }
+        if (
+          typeof row.kind !== "string" ||
+          !RESEARCH_VISIT_KINDS.has(row.kind)
+        ) {
+          errors.push(`researchVisits[${i}].kind is invalid`)
+        }
+        if (typeof row.checkedAt === "string" && row.checkedAt.trim()) {
+          if (!isValidDate(row.checkedAt)) {
+            errors.push(`researchVisits[${i}].checkedAt must be a valid date`)
+          }
+        }
+        if (
+          row.url !== undefined &&
+          row.url !== null &&
+          row.url !== "" &&
+          (typeof row.url !== "string" || !isAbsoluteUrl(row.url))
+        ) {
+          errors.push(`researchVisits[${i}].url must be a valid URL`)
+        }
+      })
+    }
+  }
+
+  if (
+    payload.priceBenchmarks !== undefined &&
+    payload.priceBenchmarks !== null
+  ) {
+    if (!Array.isArray(payload.priceBenchmarks)) {
+      errors.push("priceBenchmarks must be an array")
+    } else if (payload.priceBenchmarks.length > MAX_RESEARCH_LIST) {
+      errors.push(`Too many priceBenchmarks (max ${MAX_RESEARCH_LIST})`)
+    } else {
+      payload.priceBenchmarks.forEach((b, i) => {
+        if (!b || typeof b !== "object") {
+          errors.push(`priceBenchmarks[${i}] must be an object`)
+          return
+        }
+        const row = b as Record<string, unknown>
+        if (typeof row.itemLabel !== "string" || !row.itemLabel.trim()) {
+          errors.push(`priceBenchmarks[${i}].itemLabel is required`)
+        }
+        if (typeof row.venue !== "string" || !row.venue.trim()) {
+          errors.push(`priceBenchmarks[${i}].venue is required`)
+        }
+        if (
+          row.url !== undefined &&
+          row.url !== null &&
+          row.url !== "" &&
+          (typeof row.url !== "string" || !isAbsoluteUrl(row.url))
+        ) {
+          errors.push(`priceBenchmarks[${i}].url must be a valid URL`)
+        }
+      })
+    }
+  }
+
+  if (payload.researchLinks !== undefined && payload.researchLinks !== null) {
+    if (!Array.isArray(payload.researchLinks)) {
+      errors.push("researchLinks must be an array")
+    } else if (payload.researchLinks.length > MAX_RESEARCH_LIST) {
+      errors.push(`Too many researchLinks (max ${MAX_RESEARCH_LIST})`)
+    } else {
+      payload.researchLinks.forEach((l, i) => {
+        if (!l || typeof l !== "object") {
+          errors.push(`researchLinks[${i}] must be an object`)
+          return
+        }
+        const row = l as Record<string, unknown>
+        if (typeof row.label !== "string" || !row.label.trim()) {
+          errors.push(`researchLinks[${i}].label is required`)
+        }
+        if (typeof row.url !== "string" || !isAbsoluteUrl(row.url)) {
+          errors.push(`researchLinks[${i}].url must be a valid URL`)
+        }
+      })
+    }
+  }
+
+  if (
+    payload.buyingPlanSteps !== undefined &&
+    payload.buyingPlanSteps !== null
+  ) {
+    if (!Array.isArray(payload.buyingPlanSteps)) {
+      errors.push("buyingPlanSteps must be an array")
+    } else if (payload.buyingPlanSteps.length > MAX_RESEARCH_LIST) {
+      errors.push(`Too many buyingPlanSteps (max ${MAX_RESEARCH_LIST})`)
+    } else {
+      payload.buyingPlanSteps.forEach((s, i) => {
+        if (!s || typeof s !== "object") {
+          errors.push(`buyingPlanSteps[${i}] must be an object`)
+          return
+        }
+        const row = s as Record<string, unknown>
+        if (typeof row.title !== "string" || !row.title.trim()) {
+          errors.push(`buyingPlanSteps[${i}].title is required`)
+        }
+      })
+    }
+  }
+}
 
 function validateListingFields(
   payload: {

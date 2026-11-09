@@ -1,7 +1,25 @@
+import type {
+  BuyingPlanStep,
+  BuyingStage,
+  HaveDisposition,
+  PriceBenchmark,
+  ResearchLink,
+  ResearchVisit,
+} from "@/lib/types/want-research"
+
 export type ProductType = "want" | "have"
 
 /** Resale / listing lifecycle for “I have” items */
 export type ListingStatus = "not_listed" | "selling" | "sold"
+
+export type {
+  BuyingPlanStep,
+  BuyingStage,
+  HaveDisposition,
+  PriceBenchmark,
+  ResearchLink,
+  ResearchVisit,
+}
 
 /** One product photo; legacy docs may still store plain URL strings in `images`. */
 export interface ProductImageEntry {
@@ -47,6 +65,16 @@ export interface WantProduct extends BaseProduct {
   currentPrice?: number
   priceHistory?: PriceHistory[]
   targetPrice?: number // Desired price to buy at
+  /** Looking → shortlisted → ready → ordered → bought */
+  buyingStage?: BuyingStage
+  /** Optional group (e.g. “Orlando Apple trip” basket) */
+  wantBasketId?: string | null
+  researchVisits?: ResearchVisit[]
+  priceBenchmarks?: PriceBenchmark[]
+  researchLinks?: ResearchLink[]
+  buyingPlanSteps?: BuyingPlanStep[]
+  /** Free-form buying plan / research summary (plain or markdown) */
+  researchSummary?: string
 }
 
 export interface HaveProduct extends BaseProduct {
@@ -62,10 +90,18 @@ export interface HaveProduct extends BaseProduct {
   listingPlatforms?: string[]
   /** not_listed → selling → sold */
   listingStatus?: ListingStatus
+  /** kept | selling | sold | gifted | recycled */
+  disposition?: HaveDisposition
   /** ISO date string when the item sold */
   soldAt?: string
   /** Free text: platform or buyer channel when sold */
   soldWhere?: string
+  /** Preserved from want when converted */
+  convertedFromWantId?: string
+  researchVisits?: ResearchVisit[]
+  priceBenchmarks?: PriceBenchmark[]
+  researchLinks?: ResearchLink[]
+  researchSummary?: string
   /** @deprecated Old UI — prefer `listingStatus` + `listingPlatforms` */
   isSelling?: boolean
   /** @deprecated Old UI — prefer `listingPlatforms` */

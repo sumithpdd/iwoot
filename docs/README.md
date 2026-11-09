@@ -59,9 +59,9 @@ Complete guide to all documentation files in the IWOOT project.
    - Stores, “I have” products, images, listing fields
    - `/sell-compare` hub (Sonos Move, Nebula, AirPods, …)
 
-3. **`docs/MCP.md`** - Claude / ChatGPT MCP connector for inventory + listings
+3. **`docs/MCP.md`** - Claude / ChatGPT MCP connector (shared tools with chat; `/mcp` token UI)
 
-3. **`docs/FIRESTORE_PRODUCT_EXAMPLE.md`** - Example `products` document (field shapes, legacy `images`)
+4. **`docs/FIRESTORE_PRODUCT_EXAMPLE.md`** - Example `products` document (field shapes, legacy `images`)
 
 ## 🔐 Security & Configuration
 

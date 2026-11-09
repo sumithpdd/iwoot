@@ -1,46 +1,18 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
-import { listProductsByUser } from "@/lib/server/repositories/products.repository"
-import { getProductById } from "@/lib/server/repositories/products.repository"
-import {
-  getSellComparePageBySlug,
-  listSellComparePages,
-} from "@/lib/server/repositories/sell-compare.repository"
 import {
   LIVE_LISTING_PLATFORMS,
-  recordLiveListing,
-  updateProductListingStatus,
-} from "@/lib/server/resale/record-live-listing"
-import type { HaveProduct, Product } from "@/lib/types/product"
-import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
-import { htmlToPlainText } from "@/lib/utils/html-plain-text"
+  createInventoryToolHandlers,
+} from "@/lib/server/ai/inventory-tool-handlers"
 
-function summarize(p: Product) {
-  if (p.type === "have") {
-    const h = p as HaveProduct
-    return {
-      id: p.id,
-      type: p.type,
-      name: p.name,
-      brand: p.brand,
-      model: p.model,
-      sku: p.sku,
-      priceBought: h.priceBought,
-      listingStatus: getListingStatus(h),
-      listingPlatforms: getListingPlatforms(h),
-      condition: h.condition,
-    }
-  }
-  return {
-    id: p.id,
-    type: p.type,
-    name: p.name,
-    brand: p.brand,
-    model: p.model,
-    currentPrice: p.currentPrice,
-    targetPrice: p.targetPrice,
-  }
-}
+const BUYING_STAGE_ENUM = [
+  "researching",
+  "shortlisted",
+  "ready_to_buy",
+  "ordered",
+  "bought",
+  "cancelled",
+] as const
 
 function textResult(data: unknown, isError = false) {
   return {
@@ -49,34 +21,52 @@ function textResult(data: unknown, isError = false) {
   }
 }
 
+function isErrorPayload(data: unknown): boolean {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "error" in data &&
+    typeof (data as { error: unknown }).error === "string"
+  )
+}
+
+function isOkFalse(data: unknown): boolean {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "ok" in data &&
+    (data as { ok: unknown }).ok === false
+  )
+}
+
+type McpScopes = { read?: boolean; write?: boolean }
+
 /**
- * MCP tools for Claude / ChatGPT / Cursor over Streamable HTTP.
- * Bound to a single user id resolved from the API key.
+ * MCP tools for Claude / ChatGPT / Cursor — same handlers as Gemini chat.
  */
-export function createIwootMcpServer(uid: string): McpServer {
+export function createIwootMcpServer(
+  uid: string,
+  scopes: McpScopes = { read: true, write: true }
+): McpServer {
+  const canWrite = scopes.write !== false
+  const h = createInventoryToolHandlers(uid)
   const server = new McpServer({
     name: "iwoot",
-    version: "0.1.0",
+    version: "0.2.0",
   })
+
+  const wrap = async (fn: () => Promise<unknown>) => {
+    const data = await fn()
+    return textResult(data, isErrorPayload(data) || isOkFalse(data))
+  }
 
   server.registerTool(
     "list_inventory",
     {
       description: "List IWOOT want/have products for the authenticated user.",
-      inputSchema: {
-        type: z.enum(["all", "want", "have"]).default("all"),
-      },
+      inputSchema: { type: z.enum(["all", "want", "have"]).default("all") },
     },
-    async ({ type }) => {
-      const products = await listProductsByUser(
-        uid,
-        type === "all" ? undefined : type
-      )
-      return textResult({
-        count: products.length,
-        products: products.map(summarize),
-      })
-    }
+    async (args) => wrap(() => h.list_inventory(args))
   )
 
   server.registerTool(
@@ -85,106 +75,65 @@ export function createIwootMcpServer(uid: string): McpServer {
       description: "Get one product by id (must belong to the user).",
       inputSchema: { productId: z.string() },
     },
-    async ({ productId }) => {
-      const product = await getProductById(productId)
-      if (!product || product.userId !== uid) {
-        return textResult({ error: "Not found" }, true)
-      }
-      return textResult(summarize(product))
-    }
+    async (args) => wrap(() => h.get_product(args))
   )
 
   server.registerTool(
     "list_sell_compare_pages",
     {
-      description:
-        "List Firestore sell-compare pages (Gumtree / CeX / Shpock reference grids).",
+      description: "List Firestore sell-compare pages.",
     },
-    async () => {
-      const pages = await listSellComparePages({ publishedOnly: true })
-      return textResult(
-        pages.map((e) => ({
-          slug: e.slug,
-          path: e.path,
-          title: e.title,
-        }))
-      )
-    }
+    async () => wrap(() => h.list_sell_compare_pages())
   )
 
   server.registerTool(
     "get_sell_compare",
     {
-      description:
-        "Venue price rows for a sell-compare slug (e.g. sonos-move, nebula-cosmos-max).",
-      inputSchema: {
-        slug: z.string(),
-      },
+      description: "Venue price rows for a sell-compare slug.",
+      inputSchema: { slug: z.string() },
     },
-    async ({ slug }) => {
-      const entry = await getSellComparePageBySlug(slug)
-      if (!entry) return textResult({ error: "Unknown slug" }, true)
-      return textResult({
-        title: entry.title,
-        path: entry.path,
-        venues: entry.venues,
-      })
-    }
+    async (args) => wrap(() => h.get_sell_compare(args))
   )
+
+  server.registerTool(
+    "list_want_research",
+    {
+      description: "Overview of want baskets and want products.",
+    },
+    async () => wrap(() => h.list_want_research())
+  )
+
+  server.registerTool(
+    "get_want_details",
+    {
+      description: "Full want product or basket research payload.",
+      inputSchema: { query: z.string() },
+    },
+    async (args) => wrap(() => h.get_want_details(args))
+  )
+
+  if (!canWrite) {
+    return server
+  }
 
   server.registerTool(
     "draft_listing",
     {
-      description:
-        "Draft a marketplace listing title/body from a have product (name or id).",
+      description: "Draft marketplace listing title/body from a have product.",
       inputSchema: {
         query: z.string(),
-        platform: z
-          .enum([
-            "Gumtree",
-            "Shpock",
-            "CeX (we buy)",
-            "Facebook Marketplace",
-            "eBay",
-          ])
-          .default("Gumtree"),
+        platform: z.enum(LIVE_LISTING_PLATFORMS).default("Gumtree"),
       },
     },
-    async ({ query, platform }) => {
-      const products = await listProductsByUser(uid, "have")
-      const q = query.trim().toLowerCase()
-      const product =
-        products.find((p) => p.id === query.trim()) ||
-        products.find((p) =>
-          `${p.name} ${p.brand} ${p.model || ""} ${p.sku || ""}`
-            .toLowerCase()
-            .includes(q)
-        )
-      if (!product || product.type !== "have") {
-        return textResult({ error: "No matching have product" }, true)
-      }
-      const h = product as HaveProduct
-      const condition = h.condition || "Good"
-      const title = `${product.brand} ${product.name}${product.model ? ` (${product.model})` : ""} — ${condition}`
-      const body = [
-        `${product.brand} ${product.name}${product.model ? `, model ${product.model}` : ""}.`,
-        `Condition: ${condition}.`,
-        `Tracker paid £${h.priceBought.toFixed(2)}. Price for ${platform} — check sell-compare first.`,
-        htmlToPlainText(h.description || "").slice(0, 400) || null,
-      ]
-        .filter(Boolean)
-        .join("\n\n")
-      return textResult({ productId: product.id, platform, title, body })
-    }
+    async (args) => wrap(() => h.draft_listing(args))
   )
 
   server.registerTool(
     "record_live_listing",
     {
-      description:
-        "After you post on Gumtree/Shpock/etc., record the live ad URL and asking price: mark the have product selling, append notes, and add a “Your live listing” row on sell-compare.",
+      description: "Record a live Gumtree/Shpock/etc. ad URL and asking price.",
       inputSchema: {
-        query: z.string().describe("Product name or Firestore id"),
+        query: z.string(),
         platform: z.enum(LIVE_LISTING_PLATFORMS),
         url: z.string().url(),
         priceGbp: z.number().nonnegative(),
@@ -194,17 +143,13 @@ export function createIwootMcpServer(uid: string): McpServer {
         setWebsite: z.boolean().optional(),
       },
     },
-    async (args) => {
-      const result = await recordLiveListing(uid, args)
-      return textResult(result, !result.ok)
-    }
+    async (args) => wrap(() => h.record_live_listing(args))
   )
 
   server.registerTool(
     "update_listing_status",
     {
-      description:
-        "Set listingStatus on a have product: not_listed | selling | sold.",
+      description: "Set listingStatus: not_listed | selling | sold.",
       inputSchema: {
         query: z.string(),
         listingStatus: z.enum(["not_listed", "selling", "sold"]),
@@ -212,10 +157,192 @@ export function createIwootMcpServer(uid: string): McpServer {
         soldAt: z.string().optional(),
       },
     },
-    async (args) => {
-      const result = await updateProductListingStatus(uid, args)
-      return textResult(result, !result.ok)
-    }
+    async (args) => wrap(() => h.update_listing_status(args))
+  )
+
+  server.registerTool(
+    "upsert_want_basket",
+    {
+      description: "Create/update a multi-item want shopping plan.",
+      inputSchema: {
+        basketId: z.string().optional(),
+        title: z.string(),
+        blurb: z.string().optional(),
+        buyingStage: z.enum(BUYING_STAGE_ENUM).optional(),
+        targetTotalGbp: z.number().nullable().optional(),
+        currencyNote: z.string().optional(),
+        researchSummary: z.string().optional(),
+      },
+    },
+    async (args) => wrap(() => h.upsert_want_basket(args))
+  )
+
+  server.registerTool(
+    "upsert_want_product",
+    {
+      description: "Create/update an I-want product.",
+      inputSchema: {
+        productId: z.string().optional(),
+        name: z.string(),
+        brand: z.string(),
+        website: z.string().url(),
+        originalPrice: z.number().positive(),
+        targetPrice: z.number().positive().optional(),
+        currentPrice: z.number().positive().optional(),
+        model: z.string().optional(),
+        sku: z.string().optional(),
+        color: z.string().optional(),
+        size: z.string().optional(),
+        category: z.string().optional(),
+        notes: z.string().optional(),
+        researchSummary: z.string().optional(),
+        buyingStage: z.enum(BUYING_STAGE_ENUM).optional(),
+        wantBasketId: z.string().nullable().optional(),
+        specifications: z.record(z.string(), z.string()).optional(),
+      },
+    },
+    async (args) => wrap(() => h.upsert_want_product(args))
+  )
+
+  server.registerTool(
+    "add_research_visit",
+    {
+      description: "Log a store visit or online check.",
+      inputSchema: {
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        place: z.string(),
+        kind: z
+          .enum([
+            "visited_store",
+            "checked_online",
+            "tried_on",
+            "spoke_to_staff",
+            "other",
+          ])
+          .optional(),
+        checkedAt: z.string().optional(),
+        whatFound: z.string(),
+        url: z.string().url().optional(),
+        priceLocal: z.number().optional(),
+        currency: z.string().optional(),
+        notes: z.string().optional(),
+      },
+    },
+    async (args) => wrap(() => h.add_research_visit(args))
+  )
+
+  server.registerTool(
+    "add_price_benchmark",
+    {
+      description: "Add a UK/US price benchmark.",
+      inputSchema: {
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        itemLabel: z.string(),
+        venue: z.string(),
+        priceGbp: z.number().nullable().optional(),
+        priceLocal: z.number().nullable().optional(),
+        currency: z.string().optional(),
+        url: z.string().url().optional(),
+        specification: z.string().optional(),
+        notes: z.string().optional(),
+        lastCheckedIso: z.string().optional(),
+      },
+    },
+    async (args) => wrap(() => h.add_price_benchmark(args))
+  )
+
+  server.registerTool(
+    "add_research_link",
+    {
+      description: "Attach a research URL.",
+      inputSchema: {
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        label: z.string(),
+        url: z.string().url(),
+        notes: z.string().optional(),
+      },
+    },
+    async (args) => wrap(() => h.add_research_link(args))
+  )
+
+  server.registerTool(
+    "set_buying_plan_steps",
+    {
+      description: "Replace buying-plan checklist.",
+      inputSchema: {
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        steps: z.array(
+          z.object({
+            title: z.string(),
+            detail: z.string().optional(),
+            done: z.boolean().optional(),
+            links: z
+              .array(z.object({ label: z.string(), url: z.string().url() }))
+              .optional(),
+          })
+        ),
+      },
+    },
+    async (args) => wrap(() => h.set_buying_plan_steps(args))
+  )
+
+  server.registerTool(
+    "update_buying_stage",
+    {
+      description: "Set buyingStage on a want product or basket.",
+      inputSchema: {
+        query: z.string(),
+        target: z.enum(["product", "basket"]).optional(),
+        buyingStage: z.enum(BUYING_STAGE_ENUM),
+      },
+    },
+    async (args) => wrap(() => h.update_buying_stage(args))
+  )
+
+  server.registerTool(
+    "convert_want_to_have",
+    {
+      description: "Convert a want product to have after purchase.",
+      inputSchema: {
+        query: z.string(),
+        priceBought: z.number().positive(),
+        purchaseLocation: z.string().optional(),
+        storeId: z.string().optional(),
+        notes: z.string().optional(),
+      },
+    },
+    async (args) => wrap(() => h.convert_want_to_have(args))
+  )
+
+  server.registerTool(
+    "update_have_disposition",
+    {
+      description: "kept | selling | sold | gifted | recycled.",
+      inputSchema: {
+        query: z.string(),
+        disposition: z.enum(["kept", "selling", "sold", "gifted", "recycled"]),
+        soldWhere: z.string().optional(),
+        soldAt: z.string().optional(),
+      },
+    },
+    async (args) => wrap(() => h.update_have_disposition(args))
+  )
+
+  server.registerTool(
+    "append_product_notes",
+    {
+      description: "Append notes to a want or have product.",
+      inputSchema: {
+        query: z.string(),
+        notes: z.string(),
+        type: z.enum(["want", "have", "all"]).optional(),
+      },
+    },
+    async (args) => wrap(() => h.append_product_notes(args))
   )
 
   return server

@@ -8,18 +8,15 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { Toaster } from "@/components/ui/toaster"
-
-interface User {
-  id: string
-  email: string
-  displayName?: string
-  createdAt: string
-}
+import {
+  AdminService,
+  type AdminUserRow,
+} from "@/lib/services/admin.service"
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<AdminUserRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -31,16 +28,8 @@ export default function AdminPage() {
   const loadUsers = useCallback(async () => {
     try {
       setLoading(true)
-      const token = await user?.getIdToken()
-      if (!token) throw new Error("Not authenticated")
-      const res = await fetch("/api/admin/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error((err as { error?: string }).error || res.statusText)
-      }
-      const usersData = (await res.json()) as User[]
+      if (!user) throw new Error("Not authenticated")
+      const usersData = await AdminService.listUsers(() => user.getIdToken())
       setUsers(usersData)
     } catch (error) {
       console.error("Error loading users:", error)
