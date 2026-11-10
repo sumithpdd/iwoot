@@ -4,6 +4,10 @@ import {
   resolveMcpAccessToken,
   type McpTokenScope,
 } from "@/lib/server/mcp/access-tokens"
+import {
+  oauthProtectedResourceMetadataUrl,
+  publicOriginFromRequest,
+} from "@/lib/server/mcp/public-origin"
 
 function sameToken(provided: string, expected: string): boolean {
   const left = Buffer.from(provided)
@@ -29,11 +33,27 @@ function credential(request: Request): string {
 export type McpAuthOk = { uid: string; scopes: McpTokenScope[] }
 export type McpAuthFail = { response: Response }
 
+function unauthorizedChallenge(request: Request, message: string): Response {
+  const origin = publicOriginFromRequest(request)
+  const metadataUrl = oauthProtectedResourceMetadataUrl(origin)
+  return Response.json(
+    { error: message },
+    {
+      status: 401,
+      headers: {
+        "WWW-Authenticate": `Bearer realm="iwoot-mcp", resource_metadata="${metadataUrl}", scope="read write"`,
+      },
+    }
+  )
+}
+
 /**
  * Resolve the user for MCP:
  * 1) Shared IWOOT_MCP_TOKEN + IWOOT_MCP_USER_ID (legacy env connector)
- * 2) Opaque iwootmcp_… token from Firestore mcpAccessTokens
+ * 2) Opaque iwootmcp_… token from Firestore mcpAccessTokens (manual or OAuth)
  * 3) Firebase ID token → that uid (full read+write)
+ *
+ * Unauthenticated requests return 401 + WWW-Authenticate so ChatGPT can start OAuth.
  */
 export async function authorizeIwootMcp(
   request: Request
@@ -41,9 +61,9 @@ export async function authorizeIwootMcp(
   const provided = credential(request)
   if (!provided) {
     return {
-      response: Response.json(
-        { error: "Missing Authorization Bearer token or x-api-key" },
-        { status: 401 }
+      response: unauthorizedChallenge(
+        request,
+        "Missing Authorization Bearer token or x-api-key"
       ),
     }
   }
@@ -62,11 +82,9 @@ export async function authorizeIwootMcp(
       }
     } catch (e) {
       return {
-        response: Response.json(
-          {
-            error: e instanceof Error ? e.message : "Invalid MCP access token",
-          },
-          { status: 401 }
+        response: unauthorizedChallenge(
+          request,
+          e instanceof Error ? e.message : "Invalid MCP access token"
         ),
       }
     }
@@ -80,9 +98,9 @@ export async function authorizeIwootMcp(
   if (uid) return { uid, scopes: ["read", "write"] }
 
   return {
-    response: Response.json(
-      { error: "Invalid API key or Firebase token" },
-      { status: 401 }
+    response: unauthorizedChallenge(
+      request,
+      "Invalid API key or Firebase token"
     ),
   }
 }

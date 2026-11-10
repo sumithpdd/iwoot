@@ -46,9 +46,12 @@ Lifecycle: `researching` → `shortlisted` → `ready_to_buy` → `ordered` → 
 ## MCP (Claude / ChatGPT / Cursor)
 
 - UI: `/mcp` via `McpService` → `/api/mcp/tokens`
-- `POST /api/mcp` — Streamable HTTP
-- Auth: minted token, Firebase ID token, **or** legacy `IWOOT_MCP_TOKEN` + `IWOOT_MCP_USER_ID`
-- Tools: see `docs/MCP.md`
+- `POST /api/mcp` — Streamable HTTP; 401 includes `WWW-Authenticate` resource metadata
+- **ChatGPT:** OAuth only — Settings → Apps → custom MCP URL + OAuth. Set `NEXT_PUBLIC_APP_URL`. No static Bearer.
+- **Claude (web/desktop/mobile):** Settings → Connectors → Custom → Web → Request header `Authorization: Bearer iwootmcp_…` (include `Bearer `). Free = one custom connector.
+- **Claude Code:** `claude mcp add --transport http iwoot <url> --header "Authorization: Bearer …"`
+- **Cursor:** minted Bearer in MCP JSON, or Firebase / legacy env token
+- Setup UI: `/mcp`. Tools: `docs/MCP.md`
 
 Example: “What am I researching?” / “Add Best Buy visit…” / “Record Gumtree listing…”
 

@@ -107,6 +107,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /mcpOAuthCodes/{codeId} {
+      allow read, write: if false;
+    }
+
+    match /mcpOAuthClients/{clientId} {
+      allow read, write: if false;
+    }
+
     // Users Collection (for future use)
     match /users/{userId} {
       // Allow read if user is viewing their own data

@@ -61,7 +61,7 @@ Lists stay readable without joins. Keep the string in sync when the user picks a
 **AI chat + MCP**
 
 - In-app Gemini (`POST /api/chat`): inventory context + tools from `createInventoryToolHandlers`.
-- MCP (`POST /api/mcp`): **same handlers**. Auth: minted `iwootmcp_…` (UI `/mcp` → `McpService`), Firebase ID token, or legacy env `IWOOT_MCP_TOKEN` + `IWOOT_MCP_USER_ID`. See `docs/MCP.md`.
+- MCP (`POST /api/mcp`): **same handlers**. ChatGPT uses OAuth (`/oauth/authorize` + `/api/oauth/token`); Claude/Cursor use minted `iwootmcp_…` Bearer (`McpService`). Also Firebase ID token or legacy `IWOOT_MCP_TOKEN`. See `docs/MCP.md`.
 - Want baskets: Firestore `wantBaskets` + HTTP `/api/want-baskets` via `WantBasketService`.
 - Sell-compare: Firestore UK reference (Gumtree / CeX / Shpock). Primary pages: `/sell-compare/sonos-move`, `/sell-compare/nebula-cosmos-max`.
 

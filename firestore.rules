@@ -60,5 +60,13 @@ service cloud.firestore {
     match /mcpAccessTokens/{tokenId} {
       allow read, write: if false;
     }
+
+    match /mcpOAuthCodes/{codeId} {
+      allow read, write: if false;
+    }
+
+    match /mcpOAuthClients/{clientId} {
+      allow read, write: if false;
+    }
   }
 }

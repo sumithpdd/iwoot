@@ -54,9 +54,12 @@ Add each of these variables (click **Add** for each one):
    - Environments: ✅ Production, ✅ Preview
 10. **GEMINI_MODEL** (optional — default `gemini-flash-latest`)
    - Do not use `gemini-2.5-flash` for new Google AI Studio keys; that id is blocked for new users.
-11. **IWOOT_MCP_TOKEN** (optional — Claude / ChatGPT MCP at `/api/mcp`)
+11. **NEXT_PUBLIC_APP_URL** (recommended for MCP OAuth / ChatGPT)
+   - Exact public origin, e.g. `https://iwoot.vercel.app` (no trailing slash)
+   - Environments: ✅ Production (and Preview if you test OAuth there)
+12. **IWOOT_MCP_TOKEN** (optional — legacy shared Bearer for Claude / Cursor)
    - Long random secret; Environments: ✅ Production, ✅ Preview
-12. **IWOOT_MCP_USER_ID** (optional — Firebase uid for the MCP token)
+13. **IWOOT_MCP_USER_ID** (optional — Firebase uid for the legacy MCP token)
    - Your signed-in user’s Firebase Auth uid; Environments: ✅ Production, ✅ Preview
 
 ## Step 3: Redeploy

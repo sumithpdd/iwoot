@@ -1,22 +1,42 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth"
+import { Suspense, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth"
 import { auth } from "@/lib/firebase/config"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 
-export default function LoginPage() {
+function safeNextPath(raw: string | null): string {
+  if (!raw) return "/dashboard"
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/dashboard"
+  return raw
+}
+
+function LoginInner() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
+  const nextPath = useMemo(
+    () => safeNextPath(searchParams.get("next")),
+    [searchParams]
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,11 +59,12 @@ export default function LoginPage() {
           description: "Welcome back!",
         })
       }
-      router.push("/dashboard")
-    } catch (error: any) {
+      router.push(nextPath)
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "An error occurred",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       })
     } finally {
@@ -93,7 +114,9 @@ export default function LoginPage() {
               className="w-full"
               onClick={() => setIsSignUp(!isSignUp)}
             >
-              {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+              {isSignUp
+                ? "Already have an account? Sign in"
+                : "Don't have an account? Sign up"}
             </Button>
           </form>
         </CardContent>
@@ -102,3 +125,16 @@ export default function LoginPage() {
   )
 }
 
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900" />
+        </div>
+      }
+    >
+      <LoginInner />
+    </Suspense>
+  )
+}
