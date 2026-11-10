@@ -146,12 +146,28 @@ export async function upsertWantProduct(
     size?: string
     category?: string
     notes?: string
+    /** Rich product description (plain text or HTML) — always fill when known */
+    description?: string
     researchSummary?: string
     buyingStage?: BuyingStage
     wantBasketId?: string | null
+    brandId?: string | null
+    /** Default true: find/create Brand profile and set brandId */
+    ensureBrand?: boolean
+    brandWebsite?: string
     specifications?: Record<string, string>
+    /** Direct image URLs to download into Storage (not gallery HTML pages) */
+    imageUrls?: string[]
   }
-): Promise<{ ok: true; productId: string } | { ok: false; error: string }> {
+): Promise<
+  | {
+      ok: true
+      productId: string
+      brandId?: string | null
+      imagesAttached?: number
+    }
+  | { ok: false; error: string }
+> {
   if (!input.name.trim() || !input.brand.trim()) {
     return { ok: false, error: "name and brand are required" }
   }
@@ -166,6 +182,26 @@ export async function upsertWantProduct(
   }
 
   const today = new Date().toISOString().slice(0, 10)
+  const brandName = input.brand.trim()
+  let brandId: string | null | undefined = input.brandId
+
+  if (brandId) {
+    const { getBrandById } = await import(
+      "@/lib/server/repositories/brands.repository"
+    )
+    const b = await getBrandById(brandId)
+    if (!b || b.userId !== uid) {
+      return { ok: false, error: "brandId not found" }
+    }
+  } else if (input.ensureBrand !== false) {
+    const { ensureBrandId } = await import("@/lib/server/resale/brands")
+    brandId = await ensureBrandId(uid, brandName, {
+      website: input.brandWebsite || input.website,
+    })
+  }
+
+  const description =
+    typeof input.description === "string" ? input.description.trim() : undefined
 
   if (input.productId) {
     const existing = await getProductById(input.productId)
@@ -174,7 +210,7 @@ export async function upsertWantProduct(
     }
     await updateProductDoc(input.productId, {
       name: input.name.trim(),
-      brand: input.brand.trim(),
+      brand: brandName,
       website: input.website.trim(),
       originalPrice: input.originalPrice,
       targetPrice: input.targetPrice ?? null,
@@ -185,19 +221,39 @@ export async function upsertWantProduct(
       size: input.size ?? null,
       category: input.category ?? null,
       notes: input.notes ?? null,
+      ...(description !== undefined ? { description } : {}),
       researchSummary: input.researchSummary ?? null,
       buyingStage: input.buyingStage ?? null,
       wantBasketId:
         input.wantBasketId === undefined ? undefined : input.wantBasketId,
       specifications: input.specifications ?? null,
+      ...(brandId !== undefined ? { brandId } : {}),
     })
-    return { ok: true, productId: input.productId }
+
+    let imagesAttached = 0
+    if (input.imageUrls?.length) {
+      const { attachProductImages } = await import(
+        "@/lib/server/resale/product-media"
+      )
+      const media = await attachProductImages(uid, {
+        query: input.productId,
+        imageUrls: input.imageUrls,
+      })
+      if (media.ok) imagesAttached = media.added
+    }
+
+    return {
+      ok: true,
+      productId: input.productId,
+      brandId: brandId ?? null,
+      ...(imagesAttached ? { imagesAttached } : {}),
+    }
   }
 
   const id = await createProductDoc({
     type: "want",
     name: input.name.trim(),
-    brand: input.brand.trim(),
+    brand: brandName,
     website: input.website.trim(),
     originalPrice: input.originalPrice,
     date: today,
@@ -210,9 +266,11 @@ export async function upsertWantProduct(
     size: input.size,
     category: input.category,
     notes: input.notes,
+    description: description || undefined,
     researchSummary: input.researchSummary,
     buyingStage: input.buyingStage || "researching",
     wantBasketId: input.wantBasketId ?? null,
+    brandId: brandId ?? null,
     specifications: input.specifications,
     researchVisits: [],
     priceBenchmarks: [],
@@ -220,7 +278,24 @@ export async function upsertWantProduct(
     buyingPlanSteps: [],
   } as Omit<WantProduct, "id" | "createdAt" | "updatedAt">)
 
-  return { ok: true, productId: id }
+  let imagesAttached = 0
+  if (input.imageUrls?.length) {
+    const { attachProductImages } = await import(
+      "@/lib/server/resale/product-media"
+    )
+    const media = await attachProductImages(uid, {
+      query: id,
+      imageUrls: input.imageUrls,
+    })
+    if (media.ok) imagesAttached = media.added
+  }
+
+  return {
+    ok: true,
+    productId: id,
+    brandId: brandId ?? null,
+    ...(imagesAttached ? { imagesAttached } : {}),
+  }
 }
 
 type TargetKind = "product" | "basket"

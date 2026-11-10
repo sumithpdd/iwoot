@@ -112,6 +112,12 @@ export function createIwootMcpServer(
     async (args) => wrap(() => h.get_want_details(args))
   )
 
+  server.registerTool(
+    "list_brands",
+    { description: "List brand profiles.", inputSchema: {} },
+    async () => wrap(() => h.list_brands())
+  )
+
   if (!canWrite) {
     return server
   }
@@ -180,7 +186,8 @@ export function createIwootMcpServer(
   server.registerTool(
     "upsert_want_product",
     {
-      description: "Create/update an I-want product.",
+      description:
+        "Create/update an I-want product. Always include description when known. Auto-creates/links Brand. Pass imageUrls as direct image files (not gallery pages).",
       inputSchema: {
         productId: z.string().optional(),
         name: z.string(),
@@ -195,13 +202,61 @@ export function createIwootMcpServer(
         size: z.string().optional(),
         category: z.string().optional(),
         notes: z.string().optional(),
+        description: z.string().optional(),
         researchSummary: z.string().optional(),
         buyingStage: z.enum(BUYING_STAGE_ENUM).optional(),
         wantBasketId: z.string().nullable().optional(),
+        brandId: z.string().nullable().optional(),
+        ensureBrand: z.boolean().optional(),
+        brandWebsite: z.string().url().optional(),
         specifications: z.record(z.string(), z.string()).optional(),
+        imageUrls: z.array(z.string()).optional(),
       },
     },
     async (args) => wrap(() => h.upsert_want_product(args))
+  )
+
+  server.registerTool(
+    "upsert_brand",
+    {
+      description: "Create or update a brand profile (e.g. Apple).",
+      inputSchema: {
+        brandId: z.string().optional(),
+        name: z.string(),
+        website: z.string().url().optional(),
+        notes: z.string().optional(),
+      },
+    },
+    async (args) => wrap(() => h.upsert_brand(args))
+  )
+
+  server.registerTool(
+    "attach_brand_to_product",
+    {
+      description: "Link brandId or brandName to a product (creates brand if needed).",
+      inputSchema: {
+        query: z.string(),
+        brandId: z.string().optional(),
+        brandName: z.string().optional(),
+        createIfMissing: z.boolean().optional(),
+        website: z.string().url().optional(),
+      },
+    },
+    async (args) => wrap(() => h.attach_brand_to_product(args))
+  )
+
+  server.registerTool(
+    "attach_product_images",
+    {
+      description:
+        "Store product photos from direct image URLs (https image file or data:image). Gallery HTML pages will fail — extract each photo URL first.",
+      inputSchema: {
+        query: z.string(),
+        imageUrls: z.array(z.string()).min(1),
+        tags: z.array(z.string()).optional(),
+      },
+    },
+    async (args) => wrap(() => h.attach_product_images(args))
   )
 
   server.registerTool(

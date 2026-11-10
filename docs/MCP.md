@@ -100,13 +100,18 @@ Also accepted: Firebase ID token as Bearer (full read+write for that user), or `
 | `list_want_research` | Baskets + want products overview |
 | `get_want_details` | Full visits, benchmarks, plan |
 | `upsert_want_basket` | Multi-item shopping plan |
-| `upsert_want_product` | Create/update a want SKU |
+| `upsert_want_product` | Create/update want SKU (**set `description`**, auto brand, optional `imageUrls`) |
+| `list_brands` / `upsert_brand` | Brand profiles |
+| `attach_brand_to_product` | Link Apple/etc. brand to a product |
+| `attach_product_images` | Store photos from **direct** image URLs (not gallery HTML) |
 | `add_research_visit` | Store / online check |
 | `add_price_benchmark` | UK/US price row |
-| `add_research_link` | Attach URL |
+| `add_research_link` | Attach URL (bookmarks only — not product photos) |
 | `set_buying_plan_steps` | Buying checklist |
 | `update_buying_stage` | researching → … → bought |
 | `convert_want_to_have` | Mark purchased |
+
+**Photos via ChatGPT:** MCP cannot receive binary uploads. Ask for direct `https://…jpg` (or `data:image;base64,…`) and call `attach_product_images` / `upsert_want_product.imageUrls`. Apple gallery / product-page HTML links belong in `add_research_link`, not as photos.
 
 ## Example prompts (Claude / ChatGPT)
 

@@ -24,7 +24,9 @@ import Image from "next/image"
 import { WebsiteLinkPreview } from "@/components/website-link-preview"
 import { normalizeProductImages } from "@/lib/utils/product-images"
 import { ProductDescriptionDisplay } from "@/components/product-description-display"
+import { WantPriceResearchBadge } from "@/components/want-research-panel"
 import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
+import type { WantProduct } from "@/lib/types/product"
 
 function formatByEmail(
   email: string | undefined,
@@ -235,6 +237,9 @@ export default function ProductList({
                       mode="preview"
                       className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1"
                     />
+                    {product.type === "want" && (
+                      <WantPriceResearchBadge product={product as WantProduct} />
+                    )}
                     {product.website?.trim() && (
                       <div onClick={(e) => e.stopPropagation()}>
                         <WebsiteLinkPreview url={product.website} compact className="text-xs" />
@@ -530,6 +535,10 @@ export default function ProductList({
               className="text-sm text-gray-600 dark:text-gray-400"
             />
             
+            {product.type === "want" && (
+              <WantPriceResearchBadge product={product as WantProduct} />
+            )}
+
             {/* Price Information */}
             <div className="flex items-center justify-between p-4 bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
               <div className="flex-1">

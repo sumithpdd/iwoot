@@ -55,6 +55,8 @@ Lifecycle: `researching` → `shortlisted` → `ready_to_buy` → `ordered` → 
 
 Example: “What am I researching?” / “Add Best Buy visit…” / “Record Gumtree listing…”
 
+When creating wants via MCP/ChatGPT: always set `description`; brand auto-links via `ensureBrand`; photos need **direct image URLs** (`attach_product_images`), not gallery pages (`add_research_link` is bookmarks only).
+
 ## Listing fields (have)
 
 `listingStatus` + `listingPlatforms`; prefer `record_live_listing` from MCP/chat. One-off Admin: `.local-admin/` only.

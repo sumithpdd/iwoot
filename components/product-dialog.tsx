@@ -949,6 +949,10 @@ export default function ProductDialog({
         </div>
       )}
 
+      {type === "want" && product?.type === "want" && (
+        <WantResearchPanel product={product as WantProductType} />
+      )}
+
       <div className="space-y-2 pt-2">
         <p className="text-xs text-muted-foreground sm:text-sm">
           <span className="font-medium text-foreground">Photos:</span> the first image is the main thumbnail in your
@@ -966,10 +970,6 @@ export default function ProductDialog({
           allowReorder
         />
       </div>
-
-      {type === "want" && product?.type === "want" && (
-        <WantResearchPanel product={product as WantProductType} />
-      )}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">

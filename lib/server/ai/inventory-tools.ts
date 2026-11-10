@@ -120,7 +120,7 @@ export function buildInventoryChatTools(uid: string) {
 
     upsert_want_product: tool({
       description:
-        "Create or update an “I want” product (specs, target price, basket link, research summary).",
+        "Create or update an “I want” product. Always set description when known. Creates/links a Brand profile by default. For photos pass direct imageUrls (https image files or data:image), not gallery HTML pages.",
       inputSchema: z.object({
         productId: z.string().optional(),
         name: z.string(),
@@ -135,12 +135,64 @@ export function buildInventoryChatTools(uid: string) {
         size: z.string().optional(),
         category: z.string().optional(),
         notes: z.string().optional(),
+        description: z
+          .string()
+          .optional()
+          .describe("Product description / overview (plain or HTML)"),
         researchSummary: z.string().optional(),
         buyingStage: z.enum(BUYING_STAGE_ENUM).optional(),
         wantBasketId: z.string().nullable().optional(),
+        brandId: z.string().nullable().optional(),
+        ensureBrand: z.boolean().optional(),
+        brandWebsite: z.string().url().optional(),
         specifications: z.record(z.string(), z.string()).optional(),
+        imageUrls: z
+          .array(z.string())
+          .optional()
+          .describe("Direct image file URLs to store on the product"),
       }),
       execute: async (args) => h.upsert_want_product(args),
+    }),
+
+    list_brands: tool({
+      description: "List saved brand profiles for this user.",
+      inputSchema: z.object({}),
+      execute: async () => h.list_brands(),
+    }),
+
+    upsert_brand: tool({
+      description: "Create or update a brand profile (e.g. Apple).",
+      inputSchema: z.object({
+        brandId: z.string().optional(),
+        name: z.string(),
+        website: z.string().url().optional(),
+        notes: z.string().optional(),
+      }),
+      execute: async (args) => h.upsert_brand(args),
+    }),
+
+    attach_brand_to_product: tool({
+      description:
+        "Link a brand profile to a product (by brandId or brandName; creates brand if missing).",
+      inputSchema: z.object({
+        query: z.string(),
+        brandId: z.string().optional(),
+        brandName: z.string().optional(),
+        createIfMissing: z.boolean().optional(),
+        website: z.string().url().optional(),
+      }),
+      execute: async (args) => h.attach_brand_to_product(args),
+    }),
+
+    attach_product_images: tool({
+      description:
+        "Download direct image URLs into product photos (Firebase Storage). Do not pass gallery/HTML page links — use each photo’s image URL or data:image;base64.",
+      inputSchema: z.object({
+        query: z.string(),
+        imageUrls: z.array(z.string()).min(1),
+        tags: z.array(z.string()).optional(),
+      }),
+      execute: async (args) => h.attach_product_images(args),
     }),
 
     add_research_visit: tool({

@@ -30,26 +30,57 @@ import {
   upsertWantBasket,
   upsertWantProduct,
 } from "@/lib/server/resale/want-research"
+import {
+  attachBrandToProduct,
+  listBrands,
+  upsertBrand,
+} from "@/lib/server/resale/brands"
+import { attachProductImages } from "@/lib/server/resale/product-media"
 import type { HaveProduct, ListingStatus, Product, WantProduct } from "@/lib/types/product"
 import type { BuyingStage, HaveDisposition } from "@/lib/types/want-research"
 import { getListingPlatforms, getListingStatus } from "@/lib/utils/product-listing"
 import { htmlToPlainText } from "@/lib/utils/html-plain-text"
 import { matchOwnedProduct } from "@/lib/utils/match-owned-product"
+import { normalizeProductImages } from "@/lib/utils/product-images"
 
 export { LIVE_LISTING_PLATFORMS }
 
+function priceResearchSummary(w: WantProduct) {
+  const benchmarks = w.priceBenchmarks || []
+  const gbp = benchmarks
+    .map((b) => b.priceGbp)
+    .filter((n): n is number => typeof n === "number" && !Number.isNaN(n))
+  return {
+    researchVisitCount: w.researchVisits?.length ?? 0,
+    priceBenchmarkCount: benchmarks.length,
+    researchLinkCount: w.researchLinks?.length ?? 0,
+    priceResearch:
+      gbp.length > 0
+        ? {
+            minGbp: Math.min(...gbp),
+            maxGbp: Math.max(...gbp),
+            venues: benchmarks.map((b) => b.venue).slice(0, 8),
+          }
+        : null,
+  }
+}
+
 export function summarizeProduct(p: Product) {
+  const images = normalizeProductImages(p.images)
   const base = {
     id: p.id,
     type: p.type,
     name: p.name,
     brand: p.brand,
+    brandId: p.brandId ?? null,
     model: p.model ?? null,
     sku: p.sku ?? null,
     originalPrice: p.originalPrice,
     date: p.date,
     website: p.website,
     notes: p.notes ?? null,
+    descriptionPreview: htmlToPlainText(p.description || "").slice(0, 240) || null,
+    imageCount: images.length,
   }
   if (p.type === "have") {
     const h = p as HaveProduct
@@ -71,9 +102,7 @@ export function summarizeProduct(p: Product) {
     targetPrice: w.targetPrice ?? null,
     buyingStage: w.buyingStage ?? null,
     wantBasketId: w.wantBasketId ?? null,
-    researchVisitCount: w.researchVisits?.length ?? 0,
-    priceBenchmarkCount: w.priceBenchmarks?.length ?? 0,
-    researchLinkCount: w.researchLinks?.length ?? 0,
+    ...priceResearchSummary(w),
   }
 }
 
@@ -96,7 +125,24 @@ export function createInventoryToolHandlers(uid: string) {
       if (!product || product.userId !== uid) {
         return { error: "Product not found" }
       }
-      return summarizeProduct(product)
+      const summary = summarizeProduct(product)
+      if (product.type === "want") {
+        const w = product as WantProduct
+        return {
+          ...summary,
+          description: w.description ?? null,
+          researchSummary: w.researchSummary ?? null,
+          priceBenchmarks: w.priceBenchmarks ?? [],
+          researchVisits: w.researchVisits ?? [],
+          researchLinks: w.researchLinks ?? [],
+          images: normalizeProductImages(w.images),
+        }
+      }
+      return {
+        ...summary,
+        description: product.description ?? null,
+        images: normalizeProductImages(product.images),
+      }
     },
 
     list_sell_compare_pages: async () => {
@@ -178,6 +224,19 @@ export function createInventoryToolHandlers(uid: string) {
     upsert_want_product: (
       args: Parameters<typeof upsertWantProduct>[1]
     ) => upsertWantProduct(uid, args),
+
+    list_brands: () => listBrands(uid),
+
+    upsert_brand: (args: Parameters<typeof upsertBrand>[1]) =>
+      upsertBrand(uid, args),
+
+    attach_brand_to_product: (
+      args: Parameters<typeof attachBrandToProduct>[1]
+    ) => attachBrandToProduct(uid, args),
+
+    attach_product_images: (
+      args: Parameters<typeof attachProductImages>[1]
+    ) => attachProductImages(uid, args),
 
     add_research_visit: (
       args: Parameters<typeof addResearchVisit>[1]
