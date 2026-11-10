@@ -507,6 +507,9 @@ export async function updateBuyingStage(
 }
 
 export async function getWantDetails(uid: string, query: string) {
+  const { normalizeProductImages } = await import(
+    "@/lib/utils/product-images"
+  )
   const target = await resolveTarget(uid, query, "product")
   if ("error" in target) return { ok: false as const, error: target.error }
   if (target.kind === "basket") {
@@ -524,10 +527,24 @@ export async function getWantDetails(uid: string, query: string) {
         brand: p.brand,
         targetPrice: (p as WantProduct).targetPrice ?? null,
         buyingStage: (p as WantProduct).buyingStage ?? null,
+        uploadedImageCount: normalizeProductImages(p.images).length,
       })),
     }
   }
-  return { ok: true as const, kind: "product" as const, product: target.product }
+  const product = target.product
+  const uploadedImages = normalizeProductImages(product.images)
+  return {
+    ok: true as const,
+    kind: "product" as const,
+    media: {
+      uploadedImageCount: uploadedImages.length,
+      uploadedImageTags: uploadedImages.flatMap((im) => im.tags || []).slice(0, 20),
+      researchLinkCount: product.researchLinks?.length ?? 0,
+      note:
+        "uploadedImageCount is product photos in Storage. researchLinks are bookmarks only (e.g. Apple gallery pages), not photos. To add photos use tool attach_product_images with direct image URLs.",
+    },
+    product,
+  }
 }
 
 export async function convertWantToHave(

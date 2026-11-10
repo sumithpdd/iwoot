@@ -111,7 +111,18 @@ Also accepted: Firebase ID token as Bearer (full read+write for that user), or `
 | `update_buying_stage` | researching → … → bought |
 | `convert_want_to_have` | Mark purchased |
 
-**Photos via ChatGPT:** MCP cannot receive binary uploads. Ask for direct `https://…jpg` (or `data:image;base64,…`) and call `attach_product_images` / `upsert_want_product.imageUrls`. Apple gallery / product-page HTML links belong in `add_research_link`, not as photos.
+**Photos via ChatGPT / Claude**
+
+| What | Name |
+|------|------|
+| MCP tool (preferred) | **`attach_product_images`** — args: `query` (product name/id), `imageUrls` (string[] of direct image files), optional `tags` |
+| Also on create/update | **`upsert_want_product`** field **`imageUrls`** |
+| Browser / app HTTP upload | **`POST /api/storage/upload`** (multipart; Bearer Firebase ID token) — not used by ChatGPT |
+| Zip download | **`GET /api/products/{id}/photos/zip`** |
+
+MCP cannot receive binary chat attachments. Pass **direct** `https://…jpg/png` or `data:image;base64,…`. Apple gallery / bag HTML pages are **not** photos — use `add_research_link` for those.
+
+After deploying, **refresh the ChatGPT custom app tools** (Apps → app details → refresh) so `attach_product_images` appears. `get_want_details` / `get_product` return `uploadedImageCount` separately from `researchLinkCount`.
 
 ## Example prompts (Claude / ChatGPT)
 
